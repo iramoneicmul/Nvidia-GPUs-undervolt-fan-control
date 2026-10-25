@@ -270,6 +270,17 @@ jusqu'à 806 mV, alors que PyTorch avait détecté une instabilité à 818 mV.
 PyTorch reste donc le moteur prioritaire lorsqu'il est disponible, OpenCL
 servant de repli. La référence validée reste **831 mV**.
 
+### Rapport comparatif
+
+Le rapport est consultable directement dans la fenêtre, dans un onglet
+**Rapport** (rendu HTML, bouton d'actualisation). Il est aussi accessible
+depuis l'onglet Configuration, depuis le menu de l'icône, ou généré sans
+interface avec `nvidiaconf.exe --report`.
+
+Contenu : configuration appliquée, fréquences moyennes par niveau de charge
+(origine / optimisé / gain coloré) et détail des paliers de tension testés.
+Fichiers : `rapport-comparatif-<horodatage>.html`.
+
 ---
 
 ## Matériel / logiciel

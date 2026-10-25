@@ -261,6 +261,17 @@ PyTorch, so it is less demanding: a full run declared every tier down to
 remains the preferred engine when available, and OpenCL is the fallback. The
 validated reference stays **831 mV**.
 
+### Comparative report
+
+The comparison report is available directly in the window, in a dedicated
+**Report** tab (HTML rendering, refresh button). It can also be opened from the
+Configuration tab, from the tray menu, or generated headless with
+`nvidiaconf.exe --report`.
+
+Content: applied configuration, average clocks per load level (stock /
+optimised / colour-coded gain) and the voltage tiers tested. Files:
+`rapport-comparatif-<timestamp>.html`.
+
 ---
 
 ## Hardware / software
