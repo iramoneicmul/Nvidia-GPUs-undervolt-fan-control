@@ -203,6 +203,25 @@ service key and `nvapi64.dll`, and aborts with an explicit message otherwise.
 `nvidiaconf.exe --tray` in the machine `Run` key, so the green icon appears in
 the notification area at logon.
 
+### Crash protection
+
+A test marker (`autotune-inprogress.json`) is written before each voltage
+tier. While a test runs, the driver is polled every 3 s; if it stops
+responding or the GPU exceeds 90 °C, the test is aborted. On next start, a
+leftover marker triggers an automatic restore of the stock curve and 350 W with
+an explicit message. Emergency restore also returns the fans to the VBIOS.
+
+### Main window
+
+| Element | Detail |
+|---|---|
+| Fan profile | `silence` / `equilibre` / `froid` selector, `equilibre` by default |
+| Average frequencies | 4 load levels (light, game, sustained, heavy) × stock/optimised |
+| PCIe bus | generation and link width, current and maximum |
+| Power limit | actual value, with the 320 W target flagged when they differ |
+| Progress bar | current step, duration, intermediate result |
+| Restore | stock curve, 350 W, fans back to VBIOS, task and service removed |
+
 ---
 
 ## Hardware / software

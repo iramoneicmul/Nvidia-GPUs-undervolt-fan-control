@@ -210,6 +210,26 @@ Le MSI applique la même logique à l'installation : il exige la clé du service
 `nvidiaconf.exe --tray` dans la clé `Run` machine, pour que l'icône verte
 apparaisse dans la zone de notification à l'ouverture de session.
 
+### Protection contre les plantages
+
+Un marqueur de test (`autotune-inprogress.json`) est écrit avant chaque
+palier. Pendant le test, le pilote est interrogé toutes les 3 s ; s'il ne
+répond plus ou si le GPU dépasse 90 °C, le test est interrompu. Au démarrage
+suivant, un marqueur résiduel déclenche la restauration automatique de la
+courbe stock et de 350 W, avec un message explicite. La restauration d'urgence
+rend aussi les ventilateurs au VBIOS.
+
+### Fenêtre principale
+
+| Élément | Détail |
+|---|---|
+| Profil de ventilation | sélecteur `silence` / `equilibre` / `froid`, `equilibre` par défaut |
+| Fréquences moyennes | 4 niveaux (légère, jeu, soutenue, lourde) × origine/optimisé |
+| Bus PCIe | génération et largeur, valeurs actuelle et maximale |
+| Power limit | valeur réelle, cible 320 W signalée en cas d'écart |
+| Barre de progression | étape en cours, durée, résultat intermédiaire |
+| Restauration | courbe stock, 350 W, ventilateurs au VBIOS, tâche et service supprimés |
+
 ---
 
 ## Matériel / logiciel
