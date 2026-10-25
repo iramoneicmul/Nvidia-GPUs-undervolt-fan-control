@@ -316,8 +316,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-0c872896cb093e0ec38502dbb2b321b48a09844257f0c43e7eca8227cbcadf53  nvidiaconf.exe
-1d79e5eee7c2afd6514e2fca7ca39cee8e536aa9dd9658a62ac759bcea0899d6  nvidiaconf.msi
+0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
+398b79f01b6612eb2f0a2d717413e444de3e4e84a5e1dbd683205b19e4bfe948  nvidiaconf.msi
 ```
 
 ### First run
