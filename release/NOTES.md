@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.5 — RTX 3080 Ti FE tuning suite
+# NVIDIA Configuration 1.0.6 — NVIDIA GPU tuning suite
 
 ## Français
 
@@ -26,6 +26,18 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Rapport comparatif HTML** avant/après, consultable dans l'application.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
+
+### Nouveautés 1.0.6
+
+- **Conservation des réglages** : à la désinstallation, l'installateur demande
+  s'il faut conserver ou supprimer la configuration (courbe active, profils de
+  ventilation, mesures, journaux, rapports).
+- **Restauration à l'installation** : si une sauvegarde existe dans
+  `C:\ProgramData\NvidiaConf`, l'installateur propose de la réutiliser ou de la
+  supprimer.
+- Les fichiers de configuration ne sont plus écrasés lors d'une mise à jour
+  (`NeverOverwrite`).
+- Version MSI 1.0.6.0.
 
 ### Nouveautés 1.0.5
 
@@ -75,7 +87,7 @@ optionnels (installables depuis l'application).
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-578ac56ac4ef15d2664ab1d65edab90384b28876301a249e2e6d86a2bfc55dc6  nvidiaconf.msi
+12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
 ```
 
 ---
@@ -106,6 +118,17 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **HTML comparative report**, available inside the application.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
+
+### What's new in 1.0.6
+
+- **Settings preservation**: on uninstall, the installer asks whether to keep or
+  delete the configuration (active curve, fan profiles, measurements, logs,
+  reports).
+- **Restore on install**: if a backup exists in `C:\ProgramData\NvidiaConf`, the
+  installer offers to reuse or delete it.
+- Configuration files are no longer overwritten during an upgrade
+  (`NeverOverwrite`).
+- MSI version 1.0.6.0.
 
 ### What's new in 1.0.5
 
@@ -154,5 +177,5 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-578ac56ac4ef15d2664ab1d65edab90384b28876301a249e2e6d86a2bfc55dc6  nvidiaconf.msi
+12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
 ```

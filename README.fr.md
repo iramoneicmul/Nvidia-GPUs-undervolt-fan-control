@@ -362,7 +362,7 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-578ac56ac4ef15d2664ab1d65edab90384b28876301a249e2e6d86a2bfc55dc6  nvidiaconf.msi
+12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
 ```
 
 ### Premier lancement
