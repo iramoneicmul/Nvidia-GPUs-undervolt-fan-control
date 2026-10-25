@@ -283,6 +283,54 @@ Fichiers : `rapport-comparatif-<horodatage>.html`.
 
 ---
 
+## Téléchargement et installation
+
+**Dernière version :** <https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest>
+
+### Prérequis
+
+| Élément | Exigence |
+|---|---|
+| Système | Windows 10 / 11 (x64) |
+| GPU | carte NVIDIA exposant le contrôle des ventilateurs, la courbe V/F et le power limit via NVAPI |
+| Pilote | pilote d'affichage NVIDIA installé |
+| Runtime | .NET Framework 4.8 (intégré à Windows 10/11) |
+| Python + PyTorch | optionnel, uniquement pour le test de stabilité le plus sévère (installable depuis l'application) |
+
+### MSI (recommandé)
+
+1. Télécharger `nvidiaconf.msi`.
+2. Double-cliquer. L'installeur exige un pilote NVIDIA (`nvlddmkm`) ; il
+   s'arrête avec un message explicite sinon.
+3. Les fichiers sont installés dans `C:\Nvidia`, et `nvidiaconf.exe --tray` est
+   ajouté à la clé `Run` machine : l'icône verte apparaît dans la zone de
+   notification à l'ouverture de session.
+4. Désinstallation via *Applications et fonctionnalités*, ou
+   `msiexec /x nvidiaconf.msi`.
+
+### Exécutable portable
+
+`nvidiaconf.exe` peut être lancé directement (il cherche ses données dans
+`C:\Nvidia`, avec repli sur `C:\ProgramData\NvidiaUndervolt`). Le MSI reste
+préférable : il installe aussi le moteur NVAPI et le service de ventilation.
+
+### Empreintes (v1.0.0)
+
+```
+0cf19e86d0c7c53adb215ec83620f4e2166bdfa1607c6828c257c9a0e8328053  nvidiaconf.exe
+44f39dd0355f4c9c5110b4c24170062b032f5a6c531cfcb6b471bfa711162b0f  nvidiaconf.msi
+```
+
+### Premier lancement
+
+1. L'application vérifie la compatibilité et refuse de démarrer sur du matériel
+   non supporté.
+2. Elle affiche la configuration courante et les capteurs en temps réel.
+3. Utiliser **Trouver la configuration optimale** pour lancer l'assistant, ou
+   **Appliquer la configuration** pour appliquer le profil connu.
+
+---
+
 ## Matériel / logiciel
 
 - NVIDIA GeForce RTX 3080 Ti Founders Edition (GA102, VBIOS `94.02.71.00.ca`)

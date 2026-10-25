@@ -274,6 +274,52 @@ optimised / colour-coded gain) and the voltage tiers tested. Files:
 
 ---
 
+## Download and installation
+
+**Latest release:** <https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest>
+
+### Requirements
+
+| Item | Requirement |
+|---|---|
+| OS | Windows 10 / 11 (x64) |
+| GPU | NVIDIA card exposing NVAPI fan control, V/F curve and power limit |
+| Driver | NVIDIA display driver installed |
+| Runtime | .NET Framework 4.8 (built into Windows 10/11) |
+| Python + PyTorch | optional, only for the most demanding stability test (installable from the app) |
+
+### MSI (recommended)
+
+1. Download `nvidiaconf.msi`.
+2. Double-click it. The installer requires an NVIDIA driver (`nvlddmkm`); it
+   aborts with an explicit message otherwise.
+3. Files are installed in `C:\Nvidia`, and `nvidiaconf.exe --tray` is added to
+   the machine `Run` key, so the green icon appears in the notification area at
+   logon.
+4. Uninstall from *Apps & Features*, or with `msiexec /x nvidiaconf.msi`.
+
+### Portable executable
+
+`nvidiaconf.exe` can be run directly (it looks for its data in `C:\Nvidia`,
+falling back to `C:\ProgramData\NvidiaUndervolt`). The MSI is preferred because
+it also installs the NVAPI engine and the fan service.
+
+### Checksums (v1.0.0)
+
+```
+0cf19e86d0c7c53adb215ec83620f4e2166bdfa1607c6828c257c9a0e8328053  nvidiaconf.exe
+44f39dd0355f4c9c5110b4c24170062b032f5a6c531cfcb6b471bfa711162b0f  nvidiaconf.msi
+```
+
+### First run
+
+1. The app checks compatibility and refuses to start on unsupported hardware.
+2. It shows the current configuration and live sensors.
+3. Use **Trouver la configuration optimale** to run the tuning wizard, or
+   **Appliquer la configuration** to apply the known-good profile.
+
+---
+
 ## Hardware / software
 
 - NVIDIA GeForce RTX 3080 Ti Founders Edition (GA102, VBIOS `94.02.71.00.ca`)
