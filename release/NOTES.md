@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.7 — NVIDIA GPU tuning suite
+# NVIDIA Configuration 1.0.8 — NVIDIA GPU tuning suite
 
 ## Français
 
@@ -26,6 +26,15 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Rapport comparatif HTML** avant/après, consultable dans l'application.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
+
+### Nouveautés 1.0.8
+
+- L'application **redémarre automatiquement** le service de ventilation s'il
+  existe mais est arrêté (cas fréquent après une installation ou une
+  désinstallation).
+- Nom du service généralisé : « NVIDIA Fan Curve » (au lieu de « … RTX 3080 Ti »).
+- Cycle complet testé sur Hellfire : installation → désinstallation →
+  réinstallation, avec conservation et restauration des réglages.
 
 ### Nouveautés 1.0.7
 
@@ -96,8 +105,8 @@ optionnels (installables depuis l'application).
 ### Empreintes SHA-256
 
 ```
-dd6b115d53663a126634a9c5684595792c83663baf7ca49bb2ef5b903620a0b1  nvidiaconf.exe
-c798ea9318fff85421cc5dcb8fb83f11360712fa89421397667ac207044be7e6  nvidiaconf.msi
+43bb6a3010c59ddbfb09158b0c0e5a673d6cfda02e891b0d5225bfb5189d0dfd  nvidiaconf.exe
+0e37c2d2ac25b810d5b09f12bd46d8d2a184dd09efaca07b1e731536934b4e5e  nvidiaconf.msi
 ```
 
 ---
@@ -128,6 +137,14 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **HTML comparative report**, available inside the application.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
+
+### What's new in 1.0.8
+
+- The application now **restarts the fan service automatically** if it exists
+  but is stopped (common after an install or uninstall).
+- Service name generalised: "NVIDIA Fan Curve" (was "… RTX 3080 Ti").
+- Full cycle tested on Hellfire: install → uninstall → reinstall, with settings
+  preserved and restored.
 
 ### What's new in 1.0.7
 
@@ -196,6 +213,6 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 ### SHA-256
 
 ```
-dd6b115d53663a126634a9c5684595792c83663baf7ca49bb2ef5b903620a0b1  nvidiaconf.exe
-c798ea9318fff85421cc5dcb8fb83f11360712fa89421397667ac207044be7e6  nvidiaconf.msi
+43bb6a3010c59ddbfb09158b0c0e5a673d6cfda02e891b0d5225bfb5189d0dfd  nvidiaconf.exe
+0e37c2d2ac25b810d5b09f12bd46d8d2a184dd09efaca07b1e731536934b4e5e  nvidiaconf.msi
 ```
