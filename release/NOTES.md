@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.3 — RTX 3080 Ti FE tuning suite
+# NVIDIA Configuration 1.0.4 — RTX 3080 Ti FE tuning suite
 
 ## Français
 
@@ -26,6 +26,14 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Rapport comparatif HTML** avant/après, consultable dans l'application.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
+
+### Nouveautés 1.0.4
+
+- **Version MSI réelle** (1.0.4.0) : les anciennes installations sont remplacées
+  au lieu de s'empiler. Plus de doublons dans « Applications et fonctionnalités ».
+- **Lancement automatique** de l'application à la fin de l'installation.
+- Correctif : la désinstallation ne demande plus de fermer l'application
+  plusieurs fois.
 
 ### Nouveautés 1.0.3
 
@@ -59,7 +67,7 @@ optionnels (installables depuis l'application).
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-398b79f01b6612eb2f0a2d717413e444de3e4e84a5e1dbd683205b19e4bfe948  nvidiaconf.msi
+e6faab7a79d03e3935898bae7b2757260582a76ee5b55e8ea65fe8570ace0b1d  nvidiaconf.msi
 ```
 
 ---
@@ -90,6 +98,13 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **HTML comparative report**, available inside the application.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
+
+### What's new in 1.0.4
+
+- **Real MSI version** (1.0.4.0): previous installs are replaced instead of
+  stacking. No more duplicate entries in Apps & Features.
+- **The application starts automatically** at the end of the installation.
+- Fix: uninstall no longer asks to close the application several times.
 
 ### What's new in 1.0.3
 
@@ -123,5 +138,5 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-398b79f01b6612eb2f0a2d717413e444de3e4e84a5e1dbd683205b19e4bfe948  nvidiaconf.msi
+e6faab7a79d03e3935898bae7b2757260582a76ee5b55e8ea65fe8570ace0b1d  nvidiaconf.msi
 ```
