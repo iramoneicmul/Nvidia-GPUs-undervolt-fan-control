@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.6 — NVIDIA GPU tuning suite
+# NVIDIA Configuration 1.0.7 — NVIDIA GPU tuning suite
 
 ## Français
 
@@ -26,6 +26,16 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Rapport comparatif HTML** avant/après, consultable dans l'application.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
+
+### Nouveautés 1.0.7
+
+- **Repli API classique** : sur les cartes sans `ClientFanCoolers` (Maxwell,
+  Pascal et antérieures), le pilotage des ventilateurs bascule sur
+  `NvAPI_GPU_SetCoolerLevels` / `GetCoolerSettings`, avec `GetTachReading` pour
+  le régime. Le comportement RTX est inchangé.
+- Chemin non testé sur du matériel Pascal réel : l'application se dégrade
+  proprement au lieu de refuser.
+- Version MSI 1.0.7.0.
 
 ### Nouveautés 1.0.6
 
@@ -86,8 +96,8 @@ optionnels (installables depuis l'application).
 ### Empreintes SHA-256
 
 ```
-0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
+dd6b115d53663a126634a9c5684595792c83663baf7ca49bb2ef5b903620a0b1  nvidiaconf.exe
+c798ea9318fff85421cc5dcb8fb83f11360712fa89421397667ac207044be7e6  nvidiaconf.msi
 ```
 
 ---
@@ -118,6 +128,16 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **HTML comparative report**, available inside the application.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
+
+### What's new in 1.0.7
+
+- **Legacy API fallback**: on cards without `ClientFanCoolers` (Maxwell, Pascal
+  and earlier), fan control falls back to `NvAPI_GPU_SetCoolerLevels` /
+  `GetCoolerSettings`, with `GetTachReading` for the tachometer. RTX behaviour is
+  unchanged.
+- Untested on real Pascal hardware: the application degrades gracefully instead
+  of refusing.
+- MSI version 1.0.7.0.
 
 ### What's new in 1.0.6
 
@@ -176,6 +196,6 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 ### SHA-256
 
 ```
-0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
+dd6b115d53663a126634a9c5684595792c83663baf7ca49bb2ef5b903620a0b1  nvidiaconf.exe
+c798ea9318fff85421cc5dcb8fb83f11360712fa89421397667ac207044be7e6  nvidiaconf.msi
 ```

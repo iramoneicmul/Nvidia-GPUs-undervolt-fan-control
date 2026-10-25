@@ -52,6 +52,17 @@ capacités à l'exécution et refuse de démarrer si l'une manque.
 
 Pour vérifier une carte sans risque : `nvidiaconf.exe --check`.
 
+### Repli sur l'API classique
+
+Sur les cartes sans `ClientFanCoolers` (Maxwell, Pascal et antérieures), la
+couche ventilation bascule automatiquement sur la paire classique
+`NvAPI_GPU_SetCoolerLevels` / `GetCoolerSettings`, avec
+`NvAPI_GPU_GetTachReading` pour le tachymètre. Le comportement RTX est inchangé :
+l'API moderne est essayée en premier.
+
+Ce chemin n'a **pas encore été testé sur du matériel Pascal réel** ; il est
+implémenté pour que l'application se dégrade proprement au lieu de refuser.
+
 ---
 
 ## Configuration finale
@@ -361,8 +372,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
+dd6b115d53663a126634a9c5684595792c83663baf7ca49bb2ef5b903620a0b1  nvidiaconf.exe
+c798ea9318fff85421cc5dcb8fb83f11360712fa89421397667ac207044be7e6  nvidiaconf.msi
 ```
 
 ### Premier lancement

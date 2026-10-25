@@ -52,6 +52,16 @@ runtime and refuses to start if one is missing.
 
 To check a specific card safely: `nvidiaconf.exe --check`.
 
+### Legacy API fallback
+
+On cards without `ClientFanCoolers` (Maxwell, Pascal and earlier), the fan layer
+automatically falls back to the classic `NvAPI_GPU_SetCoolerLevels` /
+`GetCoolerSettings` pair, with `NvAPI_GPU_GetTachReading` for the tachometer.
+RTX behaviour is unchanged: the modern API is tried first.
+
+This path is **not yet tested on real Pascal hardware**; it is implemented so
+the application degrades gracefully instead of refusing outright.
+
 ---
 
 ## Final configuration
@@ -351,8 +361,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-12b0c269c3b8569681dd41fc82522daf4690dd42fb0ca5eca89ba6084297092c  nvidiaconf.msi
+dd6b115d53663a126634a9c5684595792c83663baf7ca49bb2ef5b903620a0b1  nvidiaconf.exe
+c798ea9318fff85421cc5dcb8fb83f11360712fa89421397667ac207044be7e6  nvidiaconf.msi
 ```
 
 ### First run
