@@ -1,3 +1,10 @@
+[![Latest release](https://img.shields.io/github/v/release/iramoneicmul/rtx3080ti-undervolt-fan-control)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control)
+
+**English** | [Version française](README.fr.md)
+
+---
+
 # RTX 3080 Ti FE — silent undervolt and dual-fan control
 
 Persistent, headless tuning for the **NVIDIA GeForce RTX 3080 Ti Founders
