@@ -5,6 +5,8 @@
 
 ---
 
+[Installation guide](INSTALL.md)
+
 # RTX 3080 Ti FE — silent undervolt and dual-fan control
 
 Persistent, headless tuning for the **NVIDIA GeForce RTX 3080 Ti Founders

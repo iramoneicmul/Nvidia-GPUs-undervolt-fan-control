@@ -5,6 +5,8 @@
 
 ---
 
+[Guide d'installation](INSTALL.fr.md)
+
 # RTX 3080 Ti FE — undervoltage silencieux et pilotage des deux ventilateurs
 
 Réglage persistant et sans interface pour la **NVIDIA GeForce RTX 3080 Ti
