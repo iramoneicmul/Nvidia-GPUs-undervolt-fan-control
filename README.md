@@ -317,7 +317,7 @@ it also installs the NVAPI engine and the fan service.
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-e6faab7a79d03e3935898bae7b2757260582a76ee5b55e8ea65fe8570ace0b1d  nvidiaconf.msi
+578ac56ac4ef15d2664ab1d65edab90384b28876301a249e2e6d86a2bfc55dc6  nvidiaconf.msi
 ```
 
 ### First run

@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.4 — RTX 3080 Ti FE tuning suite
+# NVIDIA Configuration 1.0.5 — RTX 3080 Ti FE tuning suite
 
 ## Français
 
@@ -26,6 +26,14 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Rapport comparatif HTML** avant/après, consultable dans l'application.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
+
+### Nouveautés 1.0.5
+
+- **Éditeur corrigé** : « iramone » (et non « irame »).
+- **Fermeture automatique** de l'application et du service de ventilation avant
+  toute installation ou désinstallation : Windows ne demande plus de fermer
+  `nvidiaconf.exe`, et le programme ne reste plus actif après coup.
+- Version MSI 1.0.5.0.
 
 ### Nouveautés 1.0.4
 
@@ -67,7 +75,7 @@ optionnels (installables depuis l'application).
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-e6faab7a79d03e3935898bae7b2757260582a76ee5b55e8ea65fe8570ace0b1d  nvidiaconf.msi
+578ac56ac4ef15d2664ab1d65edab90384b28876301a249e2e6d86a2bfc55dc6  nvidiaconf.msi
 ```
 
 ---
@@ -98,6 +106,14 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **HTML comparative report**, available inside the application.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
+
+### What's new in 1.0.5
+
+- **Fixed publisher**: "iramone" instead of "irame".
+- **Automatic shutdown** of the application and the fan service before any
+  install or uninstall: Windows no longer asks to close `nvidiaconf.exe`, and
+  the program no longer stays alive afterwards.
+- MSI version 1.0.5.0.
 
 ### What's new in 1.0.4
 
@@ -138,5 +154,5 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 
 ```
 0ae6cb33a89490d368edc46fdb514819161f7eb8ddc7d11a43f2b5327874b079  nvidiaconf.exe
-e6faab7a79d03e3935898bae7b2757260582a76ee5b55e8ea65fe8570ace0b1d  nvidiaconf.msi
+578ac56ac4ef15d2664ab1d65edab90384b28876301a249e2e6d86a2bfc55dc6  nvidiaconf.msi
 ```
