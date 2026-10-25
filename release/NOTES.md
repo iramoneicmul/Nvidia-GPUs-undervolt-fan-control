@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.0 — RTX 3080 Ti FE tuning suite
+# NVIDIA Configuration 1.0.1 — RTX 3080 Ti FE tuning suite
 
 ## Français
 
@@ -27,6 +27,12 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
 
+### Nouveautés 1.0.1
+
+- Garde-fou TDR : chaque exécution OpenCL est chronométrée ; au-delà de 1500 ms
+  le test s'arrête avant que Windows ne réinitialise le pilote.
+- Documentation du risque d'écran noir (PyTorch comme OpenCL).
+
 ### Prérequis
 
 Windows 10/11 x64, pilote NVIDIA, .NET Framework 4.8. Python + PyTorch
@@ -35,8 +41,8 @@ optionnels (installables depuis l'application).
 ### Empreintes SHA-256
 
 ```
-0cf19e86d0c7c53adb215ec83620f4e2166bdfa1607c6828c257c9a0e8328053  nvidiaconf.exe
-44f39dd0355f4c9c5110b4c24170062b032f5a6c531cfcb6b471bfa711162b0f  nvidiaconf.msi
+d55ec7065c793eeedd43aaf87d9da9a5f6158dd0abdbcddde8b3c81c2dd1c58b  nvidiaconf.exe
+90a1da65c8e180356a0303df49b30635a1f4e9b093578a97629829de6ef4de8e  nvidiaconf.msi
 ```
 
 ---
@@ -68,6 +74,12 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
 
+### What's new in 1.0.1
+
+- TDR guard: every OpenCL execution is timed; above 1500 ms the test aborts
+  before Windows resets the driver.
+- Documented black-screen risk (PyTorch and OpenCL).
+
 ### Requirements
 
 Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
@@ -76,6 +88,6 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 ### SHA-256
 
 ```
-0cf19e86d0c7c53adb215ec83620f4e2166bdfa1607c6828c257c9a0e8328053  nvidiaconf.exe
-44f39dd0355f4c9c5110b4c24170062b032f5a6c531cfcb6b471bfa711162b0f  nvidiaconf.msi
+d55ec7065c793eeedd43aaf87d9da9a5f6158dd0abdbcddde8b3c81c2dd1c58b  nvidiaconf.exe
+90a1da65c8e180356a0303df49b30635a1f4e9b093578a97629829de6ef4de8e  nvidiaconf.msi
 ```
