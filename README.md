@@ -158,6 +158,53 @@ powershell -File C:\ProgramData\NvidiaUndervolt\apply-undervolt.ps1
 
 ---
 
+## Built-in optimisation wizard
+
+`nvidiaconf.exe` embeds the whole tuning protocol.
+
+```powershell
+C:\Nvidia\nvidiaconf.exe --autotune     # or the button in the window
+```
+
+1. Reads the **real** voltage table from `courbe-stock.json` (no invented values).
+2. For each tier, from 843 mV downward: writes a plateau curve, applies it via
+   NVAPI, then runs a **240 s** stability test with bit-exact result checking.
+3. Stops at the first unstable tier.
+4. **Safety margin**: keeps the tier *above* the last stable one.
+5. Writes `plateau-active.json` and a timestamped Markdown report.
+6. Applies the power limit.
+
+A progress bar and a step label show what is running at all times; every step
+is also logged. The target frequency is read from `autotune.ini`
+(`target_mhz`, 15 MHz hardware step).
+
+---
+
+## Compatibility
+
+The application refuses to start on unsupported hardware, with an explicit
+message. A card is considered compatible only if **all** of these are true:
+
+| Capability | Check |
+|---|---|
+| NVIDIA driver / NVAPI | `NvAPI_Initialize` + GPU enumeration |
+| Controllable fans | `ClientFanCoolersGetInfo` returns at least one channel |
+| V/F curve | `snu.exe status` answers for the GPU |
+| Modifiable power limit | `nvidia-smi` reports min < max |
+
+The MSI enforces the same idea at install time: it requires the `nvlddmkm`
+service key and `nvapi64.dll`, and aborts with an explicit message otherwise.
+
+---
+
+## MSI installation
+
+`nvidiaconf.msi` installs everything into `C:\Nvidia` and registers
+`nvidiaconf.exe --tray` in the machine `Run` key, so the green icon appears in
+the notification area at logon.
+
+---
+
 ## Hardware / software
 
 - NVIDIA GeForce RTX 3080 Ti Founders Edition (GA102, VBIOS `94.02.71.00.ca`)
