@@ -372,8 +372,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-43bb6a3010c59ddbfb09158b0c0e5a673d6cfda02e891b0d5225bfb5189d0dfd  nvidiaconf.exe
-0e37c2d2ac25b810d5b09f12bd46d8d2a184dd09efaca07b1e731536934b4e5e  nvidiaconf.msi
+df30ebad1af5da0b207fa222f858004c51bb8300a741d72fa406ed0e45ce9a70  nvidiaconf.exe
+ae84efdb760ffcb29e2b4c551aaa303c54db3a2fbf24b9845f28c0fd0708b5c3  nvidiaconf.msi
 ```
 
 ### Premier lancement

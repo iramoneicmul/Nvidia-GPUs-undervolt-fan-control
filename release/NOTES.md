@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.0.8 — NVIDIA GPU tuning suite
+# NVIDIA Configuration 1.0.9 — NVIDIA GPU tuning suite
 
 ## Français
 
@@ -26,6 +26,13 @@ Founders Edition** sous Windows 11, sans MSI Afterburner.
 - **Rapport comparatif HTML** avant/après, consultable dans l'application.
 - **Compatibilité** : refus explicite sur matériel non supporté ; le MSI exige
   un pilote NVIDIA.
+
+### Nouveautés 1.0.9
+
+- **La fenêtre ne s'affiche plus au démarrage de session.** Le lancement en mode
+  tray utilise une opacité nulle puis masque la fenêtre dès le premier
+  affichage : plus de fenêtre parasite au logon.
+- La relance de l'exécutable rouvre la fenêtre de l'instance existante.
 
 ### Nouveautés 1.0.8
 
@@ -105,8 +112,8 @@ optionnels (installables depuis l'application).
 ### Empreintes SHA-256
 
 ```
-43bb6a3010c59ddbfb09158b0c0e5a673d6cfda02e891b0d5225bfb5189d0dfd  nvidiaconf.exe
-0e37c2d2ac25b810d5b09f12bd46d8d2a184dd09efaca07b1e731536934b4e5e  nvidiaconf.msi
+df30ebad1af5da0b207fa222f858004c51bb8300a741d72fa406ed0e45ce9a70  nvidiaconf.exe
+ae84efdb760ffcb29e2b4c551aaa303c54db3a2fbf24b9845f28c0fd0708b5c3  nvidiaconf.msi
 ```
 
 ---
@@ -137,6 +144,12 @@ Founders Edition** on Windows 11, without MSI Afterburner.
 - **HTML comparative report**, available inside the application.
 - **Compatibility**: explicit refusal on unsupported hardware; the MSI requires
   an NVIDIA driver.
+
+### What's new in 1.0.9
+
+- **The window no longer appears at logon.** Tray startup uses zero opacity and
+  hides the window on its first display: no stray window at login.
+- Relaunching the executable brings up the existing window.
 
 ### What's new in 1.0.8
 
@@ -213,6 +226,6 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 ### SHA-256
 
 ```
-43bb6a3010c59ddbfb09158b0c0e5a673d6cfda02e891b0d5225bfb5189d0dfd  nvidiaconf.exe
-0e37c2d2ac25b810d5b09f12bd46d8d2a184dd09efaca07b1e731536934b4e5e  nvidiaconf.msi
+df30ebad1af5da0b207fa222f858004c51bb8300a741d72fa406ed0e45ce9a70  nvidiaconf.exe
+ae84efdb760ffcb29e2b4c551aaa303c54db3a2fbf24b9845f28c0fd0708b5c3  nvidiaconf.msi
 ```
