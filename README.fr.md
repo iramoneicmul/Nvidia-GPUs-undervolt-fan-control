@@ -329,6 +329,19 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 3. Utiliser **Trouver la configuration optimale** pour lancer l'assistant, ou
    **Appliquer la configuration** pour appliquer le profil connu.
 
+### Risque d'écran noir et garde-fou TDR
+
+Windows réinitialise le pilote graphique si un kernel GPU dépasse **2 secondes**
+(TDR). L'écran devient noir quelques secondes, et peut le rester.
+
+Le risque existe avec **PyTorch comme avec OpenCL**. Notre noyau OpenCL dure
+**~100 ms**, très en dessous du seuil ; l'incident observé venait plus
+probablement de la tension basse que du moteur de test.
+
+Chaque exécution OpenCL est désormais chronométrée : au-delà de **1500 ms**, le
+test s'arrête immédiatement (`arret=kernel_trop_long`) avant que Windows ne
+réinitialise le pilote.
+
 ---
 
 ## Matériel / logiciel

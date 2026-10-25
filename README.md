@@ -318,6 +318,18 @@ it also installs the NVAPI engine and the fan service.
 3. Use **Trouver la configuration optimale** to run the tuning wizard, or
    **Appliquer la configuration** to apply the known-good profile.
 
+### Black-screen risk and TDR guard
+
+Windows resets the display driver if a GPU kernel runs longer than **2 seconds**
+(TDR). The screen goes black for a few seconds and may not come back.
+
+The risk exists with **both PyTorch and OpenCL**. Our OpenCL kernel runs for
+**~100 ms**, far below the threshold; the observed incident was more likely
+caused by the low voltage than by the test engine.
+
+Every OpenCL execution is now timed: above **1500 ms** the test aborts
+immediately (`arret=kernel_trop_long`) before Windows resets the driver.
+
 ---
 
 ## Hardware / software

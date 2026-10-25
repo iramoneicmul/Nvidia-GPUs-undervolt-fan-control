@@ -172,6 +172,8 @@ __kernel void mmul_int(__global const int* A,
 
             while (sw.Elapsed.TotalSeconds < seconds)
             {
+                var kw = Stopwatch.StartNew();
+
                 if (burn != IntPtr.Zero && burnBuf != IntPtr.Zero)
                 {
                     IntPtr bp = Marshal.AllocHGlobal(IntPtr.Size);
@@ -187,7 +189,16 @@ __kernel void mmul_int(__global const int* A,
 
                 clEnqueueNDRangeKernel(queue, kernel, 2, null, global, null, 0, null, IntPtr.Zero);
                 clFinish(queue);
+                kw.Stop();
                 iterations++;
+
+                // Garde-fou TDR : un kernel trop long ferait reset le pilote.
+                if (kw.ElapsedMilliseconds > 1500)
+                {
+                    if (log != null) log("kernel trop long (" + kw.ElapsedMilliseconds + " ms) : arret preventif");
+                    return string.Format("RESULTAT moteur=opencl iterations={0} ecarts={1} maxdiff={2} arret=kernel_trop_long",
+                        iterations, bad, maxdiff);
+                }
 
                 if (iterations % 5 == 0)
                 {
