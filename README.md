@@ -222,6 +222,26 @@ an explicit message. Emergency restore also returns the fans to the VBIOS.
 | Progress bar | current step, duration, intermediate result |
 | Restore | stock curve, 350 W, fans back to VBIOS, task and service removed |
 
+### OpenCL test engine
+
+The stability test no longer needs Python. `nvidiaconf.exe` embeds an OpenCL
+kernel (int32 matrix multiplication, 2048×2048): the result is deterministic,
+the first run is the reference, and every subsequent run is compared bit for
+bit. Any difference is a hardware computation error. Measured load: ~240 W.
+Python/PyTorch remains as an automatic fallback.
+
+### Tabbed interface
+
+| Tab | Content |
+|---|---|
+| **Identity** | name, revision, VBIOS, driver, PCI bus, VRAM, PCIe generation and width |
+| **Clocks** | stock limits, **curve min/max voltages**, plateau voltage, average clocks per load level |
+| **Configuration** | applied undervolt, power limit (with target), fan profile, 831 mV curve |
+| **Live** | clocks, voltage, power, GPU/hotspot/memory temperatures, fans, utilisation |
+
+The bottom area (progress bar, fan profile selector, action buttons) stays
+visible under every tab.
+
 ---
 
 ## Hardware / software

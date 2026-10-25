@@ -230,6 +230,26 @@ rend aussi les ventilateurs au VBIOS.
 | Barre de progression | étape en cours, durée, résultat intermédiaire |
 | Restauration | courbe stock, 350 W, ventilateurs au VBIOS, tâche et service supprimés |
 
+### Moteur de test OpenCL
+
+Le test de stabilité ne dépend plus de Python. `nvidiaconf.exe` embarque un
+noyau OpenCL (multiplication de matrices int32, 2048×2048) : le résultat est
+déterministe, la première exécution sert de référence, et chaque exécution
+suivante est comparée bit à bit. Toute différence est une erreur de calcul
+matérielle. Charge mesurée : ~240 W. Python/PyTorch reste en repli automatique.
+
+### Interface en onglets
+
+| Onglet | Contenu |
+|---|---|
+| **Identité** | nom, révision, VBIOS, pilote, bus PCI, VRAM, génération et largeur PCIe |
+| **Fréquences** | limites d'origine, **tensions min/max de la courbe**, tension du plateau, fréquences moyennes par charge |
+| **Configuration** | undervolt appliqué, power limit (avec cible), profil de ventilation, courbe 831 mV |
+| **Temps réel** | fréquences, tension, puissance, températures GPU/hotspot/mémoire, ventilateurs, charge |
+
+La zone basse (barre de progression, sélecteur de profil, boutons d'action)
+reste visible sous chaque onglet.
+
 ---
 
 ## Matériel / logiciel
