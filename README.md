@@ -1,21 +1,56 @@
 [![Latest release](https://img.shields.io/github/v/release/iramoneicmul/rtx3080ti-undervolt-fan-control)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control)
 
-**English** | [Version française](README.fr.md)
+**English** | [Version française](README.fr.md) &middot; [Installation guide](INSTALL.md)
 
 ---
 
-[Installation guide](INSTALL.md)
+# NVIDIA GPUs — silent undervolt, power limit and fan control
 
-# RTX 3080 Ti FE — silent undervolt and dual-fan control
+Persistent, headless tuning for **NVIDIA graphics cards exposing NVAPI control**
+of the V/F curve, power limit and fans. Validated on the **GeForce RTX 3080 Ti
+Founders Edition**; designed to refuse cleanly on unsupported hardware.
 
-Persistent, headless tuning for the **NVIDIA GeForce RTX 3080 Ti Founders
-Edition** on Windows 11 — no MSI Afterburner, no background overclocking suite.
+Windows 10/11 — no MSI Afterburner, no background overclocking suite.
 Everything is done through NVAPI, one scheduled task and one lightweight
 Windows service.
 
 The result: **more performance than stock, 30 W less power, lower memory
 temperatures and quieter fans.**
+
+## Compatibility
+
+The application does **not** rely on a model list — it checks capabilities at
+runtime and refuses to start if one is missing.
+
+| Capability | Check |
+|---|---|
+| NVIDIA driver / NVAPI | `NvAPI_Initialize` + GPU enumeration |
+| Controllable fans | `ClientFanCoolersGetInfo` returns at least one channel |
+| V/F curve | `snu.exe status` answers for the GPU |
+| Modifiable power limit | `nvidia-smi` reports min < max |
+
+### Likely compatible
+
+| Generation | Models | Confidence |
+|---|---|---|
+| Ampere | RTX 30xx | very high (validated on 3080 Ti FE) |
+| Ada | RTX 40xx | high |
+| Blackwell | RTX 50xx | medium to high |
+| Turing | RTX 20xx, GTX 16xx | high |
+| Professional | RTX A-series, Quadro RTX | high |
+
+### Likely refused
+
+| Case | Reason |
+|---|---|
+| Laptops | power limit and fans often locked by the vendor |
+| Tesla / datacenter | passive cooling, no controllable fan |
+| Kepler and older | no longer supported by recent drivers |
+| Locked OEM cards | VBIOS without power-limit adjustment |
+| Fanless / custom watercooling | no `ClientFanCoolers` channel |
+
+To check a specific card safely: `nvidiaconf.exe --check`.
 
 ---
 

@@ -1,21 +1,56 @@
 [![Dernière version](https://img.shields.io/github/v/release/iramoneicmul/rtx3080ti-undervolt-fan-control)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest)
 [![Plateforme](https://img.shields.io/badge/plateforme-Windows%2010%2F11%20x64-blue)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control)
 
-[English version](README.md) | **Français**
+[English version](README.md) &middot; [Guide d'installation](INSTALL.fr.md)
 
 ---
 
-[Guide d'installation](INSTALL.fr.md)
+# Cartes NVIDIA — undervoltage silencieux, power limit et pilotage des ventilateurs
 
-# RTX 3080 Ti FE — undervoltage silencieux et pilotage des deux ventilateurs
+Réglage persistant et sans interface pour les **cartes NVIDIA exposant le
+contrôle NVAPI** de la courbe tension/fréquence, du power limit et des
+ventilateurs. Validé sur la **GeForce RTX 3080 Ti Founders Edition** ; conçu
+pour refuser proprement le matériel non compatible.
 
-Réglage persistant et sans interface pour la **NVIDIA GeForce RTX 3080 Ti
-Founders Edition** sous Windows 11 — sans MSI Afterburner, sans suite
-d'overclocking résidente. Tout passe par NVAPI, une tâche planifiée et un
-service Windows léger.
+Windows 10/11 — sans MSI Afterburner, sans suite d'overclocking résidente.
+Tout passe par NVAPI, une tâche planifiée et un service Windows léger.
 
 Résultat : **plus de performance qu'à l'origine, 30 W de moins, une mémoire
 plus froide et des ventilateurs plus silencieux.**
+
+## Compatibilité
+
+L'application ne se base **pas** sur une liste de modèles : elle vérifie les
+capacités à l'exécution et refuse de démarrer si l'une manque.
+
+| Capacité | Vérification |
+|---|---|
+| Pilote NVIDIA / NVAPI | `NvAPI_Initialize` + énumération du GPU |
+| Ventilateurs pilotables | `ClientFanCoolersGetInfo` renvoie au moins un canal |
+| Courbe V/F | `snu.exe status` répond pour le GPU |
+| Power limit modifiable | `nvidia-smi` indique min < max |
+
+### Probablement compatibles
+
+| Génération | Modèles | Confiance |
+|---|---|---|
+| Ampere | RTX 30xx | très élevée (validé sur 3080 Ti FE) |
+| Ada | RTX 40xx | élevée |
+| Blackwell | RTX 50xx | moyenne à élevée |
+| Turing | RTX 20xx, GTX 16xx | élevée |
+| Professionnelles | RTX A-series, Quadro RTX | élevée |
+
+### Probablement refusées
+
+| Cas | Raison |
+|---|---|
+| Portables | power limit et ventilateurs souvent verrouillés par le constructeur |
+| Tesla / datacenter | refroidissement passif, pas de ventilateur pilotable |
+| Kepler et antérieures | plus supportées par les drivers récents |
+| Cartes OEM verrouillées | VBIOS sans ajustement du power limit |
+| Sans ventilateur / watercooling custom | aucun canal `ClientFanCoolers` |
+
+Pour vérifier une carte sans risque : `nvidiaconf.exe --check`.
 
 ---
 
