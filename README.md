@@ -242,6 +242,25 @@ Python/PyTorch remains as an automatic fallback.
 The bottom area (progress bar, fan profile selector, action buttons) stays
 visible under every tab.
 
+### Sensors tab and fan profile test
+
+A GPU-Z-style live table shows each value with its minimum and maximum since
+start: GPU/memory clocks, voltage, power, power limit, GPU/hotspot/memory
+temperatures, both fans (rpm and %), GPU load, VRAM used, PCIe generation and
+width.
+
+The "Test fan profiles" button applies `silence`, `equilibre` and `froid` in
+turn, runs a 1-minute load for each, records average/max rpm and peak
+temperatures, writes a Markdown report and restores `equilibre`.
+
+### Known limitation
+
+The naive OpenCL int32 kernel peaks at **~240 W**, versus **~300 W** with
+PyTorch, so it is less demanding: a full run declared every tier down to
+806 mV stable, while PyTorch had found 818 mV unstable. PyTorch therefore
+remains the preferred engine when available, and OpenCL is the fallback. The
+validated reference stays **831 mV**.
+
 ---
 
 ## Hardware / software

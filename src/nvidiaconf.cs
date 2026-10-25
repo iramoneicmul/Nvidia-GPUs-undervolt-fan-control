@@ -20,6 +20,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows.Forms;
 
 #region NVAPI : capteurs internes et ventilateurs
@@ -102,6 +103,21 @@ internal static class NvSensors
         return (T)(object)Marshal.GetDelegateForFunctionPointer(QI(id), typeof(T));
     }
 
+    private delegate uint D_FullName(IntPtr gpu, StringBuilder name);
+
+    public static string GpuName()
+    {
+        if (!Init()) return "inconnu";
+        try
+        {
+            var fn = Bind<D_FullName>(0xCEEE8E9F);
+            var sb = new StringBuilder(64);
+            if (fn(_gpu, sb) != 0) return "inconnu";
+            return sb.ToString();
+        }
+        catch { return "inconnu"; }
+    }
+
     private static int Sensor(uint mask, int index)
     {
         try
@@ -179,27 +195,43 @@ internal sealed class Snapshot
     public double VoltageMv;
     public int GpuUsage;
     public string Undervolt = "?", Profile = "?", Curve831 = "?";
+    public string PcieGen = "-", PcieWidth = "-";
+    public string VoltMin = "-", VoltMax = "-", VoltPlateau = "-";
 }
 
-internal sealed class MainForm : Form
+internal sealed partial class MainForm : Form
 {
-    private const string Root = @"C:\ProgramData\NvidiaUndervolt";
+    private static readonly string Root = DetectRoot();
+
+    private static string DetectRoot()
+    {
+        string a = @"C:\Nvidia";
+        if (File.Exists(Path.Combine(a, "snu.exe"))) return a;
+        return @"C:\ProgramData\NvidiaUndervolt";
+    }
     private const string Smi = "nvidia-smi";
 
     private readonly NotifyIcon _tray;
-    private readonly Timer _timer;
+    private readonly System.Windows.Forms.Timer _timer;
     private readonly Snapshot _s = new Snapshot();
 
     private Label _lTitle, _lStatus;
     private readonly Dictionary<string, Label> _v = new Dictionary<string, Label>();
+    private ProgressBar _bar;
+    private Label _step;
+    private Button _btnApply, _btnRestore, _btnPersist;
+    private ComboBox _profileBox;
+    private Label _lProfile;
+    private volatile bool _busy;
 
     private readonly bool _startHidden;
 
-    public MainForm(bool startHidden)
+    public MainForm(bool startHidden, bool autoTune = false)
     {
         _startHidden = startHidden;
+        _autoTuneRequested = autoTune;
         Text = "NVIDIA Configuration - RTX 3080 Ti FE";
-        ClientSize = new Size(560, 720);
+        ClientSize = new Size(560, 640);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -231,11 +263,12 @@ internal sealed class MainForm : Form
         _tray.ContextMenuStrip = menu;
         _tray.DoubleClick += (o, e) => { Show(); WindowState = FormWindowState.Normal; Activate(); };
 
-        _timer = new Timer { Interval = 2000 };
+        _timer = new System.Windows.Forms.Timer { Interval = 2000 };
         _timer.Tick += (o, e) => Refresh(false);
         _timer.Start();
 
         Refresh(true);
+        if (_autoTuneRequested) AutoTune();
         if (_startHidden)
         {
             WindowState = FormWindowState.Minimized;
@@ -263,43 +296,160 @@ internal sealed class MainForm : Form
 
     private void BuildUi()
     {
-        int y = 14;
-
-        _lTitle = new Label
+        // ---------------- zone basse commune ----------------
+        var bottom = new Panel
         {
-            Text = "NVIDIA Configuration",
-            Font = new Font("Segoe UI Semibold", 15f),
-            ForeColor = Color.FromArgb(118, 185, 0),
-            AutoSize = true,
-            Location = new Point(16, y)
+            Dock = DockStyle.Bottom,
+            Height = 156,
+            BackColor = Color.FromArgb(28, 28, 28)
         };
-        Controls.Add(_lTitle);
+        Controls.Add(bottom);
+
+        _lProfile = new Label
+        {
+            Text = "Profil de ventilation",
+            ForeColor = Color.Silver,
+            AutoSize = false,
+            Size = new Size(160, 18),
+            Location = new Point(16, 10)
+        };
+        bottom.Controls.Add(_lProfile);
+
+        _profileBox = new ComboBox
+        {
+            Location = new Point(182, 6),
+            Size = new Size(160, 24),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.Gainsboro,
+            FlatStyle = FlatStyle.Flat
+        };
+        _profileBox.Items.AddRange(new object[] { "silence", "equilibre", "froid" });
+        _profileBox.SelectedIndex = 1;
+        _profileBox.SelectedIndexChanged += (o, e) => OnProfileChanged();
+        bottom.Controls.Add(_profileBox);
 
         _lStatus = new Label
         {
             Text = "",
+            ForeColor = Color.FromArgb(118, 185, 0),
+            AutoSize = false,
+            Size = new Size(360, 18),
+            Location = new Point(180, 10),
+            TextAlign = ContentAlignment.MiddleRight
+        };
+        bottom.Controls.Add(_lStatus);
+
+        _step = new Label
+        {
+            Text = "Pret.",
             ForeColor = Color.Silver,
             AutoSize = false,
-            Size = new Size(520, 18),
-            Location = new Point(18, y + 30)
+            Size = new Size(524, 18),
+            Location = new Point(16, 36)
         };
-        Controls.Add(_lStatus);
+        bottom.Controls.Add(_step);
 
-        y += 62;
-        y = Section("Identite", y, new[]
+        _bar = new ProgressBar
+        {
+            Location = new Point(16, 56),
+            Size = new Size(524, 16),
+            Minimum = 0,
+            Maximum = 100,
+            Value = 0,
+            Style = ProgressBarStyle.Continuous
+        };
+        bottom.Controls.Add(_bar);
+
+        _btnApply = MakeButton("Appliquer la configuration", 16, 80, 168);
+        _btnApply.Click += (o, e) => ApplyConfig();
+        bottom.Controls.Add(_btnApply);
+
+        _btnRestore = MakeButton("Restaurer l'origine", 196, 80, 156);
+        _btnRestore.Click += (o, e) => RestoreOriginal();
+        bottom.Controls.Add(_btnRestore);
+
+        _btnPersist = MakeButton("Reappliquer au demarrage", 364, 80, 176);
+        _btnPersist.Click += (o, e) => InstallPersistence();
+        bottom.Controls.Add(_btnPersist);
+
+        var btnTune = MakeButton("Trouver la configuration optimale", 16, 114, 340);
+        btnTune.Click += (o, e) => AutoTune();
+        bottom.Controls.Add(btnTune);
+
+        var btnFreq = MakeButton("Mesurer les frequences", 364, 114, 176);
+        btnFreq.Click += (o, e) => MeasureFrequencies();
+        bottom.Controls.Add(btnFreq);
+
+        var btnFanTest = MakeButton("Tester les profils de ventilation", 16, 80, 240);
+        btnFanTest.Click += (o, e) => TestFanProfiles();
+        bottom.Controls.Add(btnFanTest);
+
+        btnTune.Location = new Point(264, 80);
+        btnFreq.Location = new Point(16, 112);
+        _btnApply.Location = new Point(224, 112);
+        _btnRestore.Location = new Point(388, 112);
+        _btnPersist.Location = new Point(16, 144);
+        _btnPersist.Width = 280;
+
+        bottom.Height = 182;
+
+        // ---------------- onglets ----------------
+        var tabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9f)
+        };
+
+        var tIdent = new TabPage("Identite") { BackColor = Color.FromArgb(24, 24, 24) };
+        var tFreq = new TabPage("Frequences") { BackColor = Color.FromArgb(24, 24, 24) };
+        var tConf = new TabPage("Configuration") { BackColor = Color.FromArgb(24, 24, 24) };
+        var tLive = new TabPage("Temps reel") { BackColor = Color.FromArgb(24, 24, 24) };
+        var tSensors = new TabPage("Capteurs") { BackColor = Color.FromArgb(24, 24, 24) };
+
+        tabs.TabPages.AddRange(new TabPage[] { tIdent, tFreq, tConf, tLive, tSensors });
+        Controls.Add(tabs);
+        tabs.BringToFront();
+
+        int y1 = 8;
+        y1 = Section(tIdent, "Identite", y1, new[]
         {
             "Nom", "Revision", "VBIOS", "Pilote", "Bus PCI", "Memoire video"
         });
-        y = Section("Limites d'origine", y, new[]
+        Section(tIdent, "Bus PCI Express", y1, new[]
         {
-            "Frequence GPU max", "Frequence memoire max", "Puissance min", "Puissance max",
-            "Puissance par defaut", "Coupure thermique", "Ralentissement thermique"
+            "Bus PCIe (version)", "Bus PCIe (largeur)"
         });
-        y = Section("Configuration appliquee", y, new[]
+
+        int y2 = 8;
+        y2 = Section(tFreq, "Limites d'origine", y2, new[]
+        {
+            "Frequence GPU max", "Frequence memoire max", "Puissance min",
+            "Puissance max", "Puissance par defaut", "Coupure thermique",
+            "Ralentissement thermique"
+        });
+        y2 = Section(tFreq, "Tensions de la courbe", y2, new[]
+        {
+            "Tension min (courbe)", "Tension max (courbe)", "Tension du plateau"
+        });
+        Section(tFreq, "Frequences moyennes (MHz)", y2, new[]
+        {
+            "Legere - origine", "Legere - optimise",
+            "Jeu - origine", "Jeu - optimise",
+            "Soutenue - origine", "Soutenue - optimise",
+            "Lourde - origine", "Lourde - optimise"
+        });
+
+        int y3 = 8;
+        Section(tConf, "Configuration appliquee", y3, new[]
         {
             "Undervolt", "Power limit", "Profil ventilation", "Courbe 831 mV"
         });
-        y = Section("Temps reel", y, new[]
+
+        BuildSensorsTab(tSensors);
+
+        int y4 = 8;
+        Section(tLive, "Temps reel", y4, new[]
         {
             "Frequence GPU", "Frequence memoire", "Tension", "Puissance",
             "Temperature GPU", "Hotspot", "Temperature memoire",
@@ -307,7 +457,163 @@ internal sealed class MainForm : Form
         });
     }
 
-    private int Section(string title, int y, string[] keys)
+    private Button MakeButton(string text, int x, int y, int w)
+    {
+        var b = new Button
+        {
+            Text = text,
+            Location = new Point(x, y),
+            Size = new Size(w, 28),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.Gainsboro
+        };
+        b.FlatAppearance.BorderColor = Color.FromArgb(118, 185, 0);
+        return b;
+    }
+
+    // ------------------------------------------------------------------
+    //  Execution d'une sequence d'etapes avec barre de progression
+    // ------------------------------------------------------------------
+    private void RunSteps(string titre, string[] etapes, Action<int> action)
+    {
+        if (_busy) return;
+        _busy = true;
+        _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
+        _bar.Value = 0;
+
+        var th = new Thread(() =>
+        {
+            bool ok = true;
+            for (int i = 0; i < etapes.Length; i++)
+            {
+                int idx = i;
+                Ui(() =>
+                {
+                    _step.Text = string.Format("{0} ({1}/{2}) : {3}", titre, idx + 1, etapes.Length, etapes[idx]);
+                    _bar.Value = (int)(100.0 * idx / etapes.Length);
+                });
+                try { action(idx); }
+                catch (Exception e)
+                {
+                    ok = false;
+                    Ui(() => { _step.Text = "Echec : " + e.Message; });
+                    break;
+                }
+            }
+
+            Ui(() =>
+            {
+                _bar.Value = ok ? 100 : _bar.Value;
+                if (ok) _step.Text = titre + " : termine.";
+                _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = true;
+                _busy = false;
+            });
+            Refresh(true);
+        });
+        th.IsBackground = true;
+        th.Start();
+    }
+
+    private void Ui(Action a)
+    {
+        try { if (InvokeRequired) BeginInvoke(a); else a(); }
+        catch { }
+    }
+
+    private static void Ps(string command)
+    {
+        var psi = new ProcessStartInfo("powershell.exe",
+            "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + command.Replace("\"", "\\\"") + "\"")
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        using (var p = Process.Start(psi)) { p.WaitForExit(60000); }
+    }
+
+    private void ApplyConfig()
+    {
+        RunSteps("Application de la configuration", new[]
+        {
+            "Application de la courbe V/F",
+            "Reglage du power limit a 320 W",
+            "Verification de la courbe",
+            "Verification du service de ventilation"
+        }, i =>
+        {
+            switch (i)
+            {
+                case 0:
+                    Ps("& '" + Path.Combine(Root, "snu.exe") + "' --in-tuning-file '" +
+                       Path.Combine(Root, "plateau-1845-831.json") + "' --no-persist | Out-Null");
+                    break;
+                case 1:
+                    Ps("& nvidia-smi -pl 320 | Out-Null");
+                    break;
+                case 2:
+                    Ps("& '" + Path.Combine(Root, "snu.exe") + "' status | Out-Null");
+                    break;
+                case 3:
+                    Ps("Get-Service NvidiaFanCurve -ErrorAction SilentlyContinue | Out-Null");
+                    break;
+            }
+        });
+    }
+
+    private void RestoreOriginal()
+    {
+        if (MessageBox.Show(
+            "Restaurer la configuration d'origine ?\n\n" +
+            "- courbe V/F stock\n- power limit 350 W\n- ventilateurs rendus au VBIOS\n" +
+            "- service et tache planifiee supprimes",
+            "Restauration", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            return;
+
+        RunSteps("Restauration de l'origine", new[]
+        {
+            "Arret du service de ventilation",
+            "Suppression du service",
+            "Ventilateurs rendus au VBIOS",
+            "Courbe V/F remise au stock",
+            "Power limit remis a 350 W",
+            "Suppression de la tache planifiee",
+            "Verification"
+        }, i =>
+        {
+            switch (i)
+            {
+                case 0: Ps("& sc.exe stop NvidiaFanCurve | Out-Null"); break;
+                case 1: Ps("& sc.exe delete NvidiaFanCurve | Out-Null"); break;
+                case 2: Ps("& '" + Path.Combine(Root, "nvfan.exe") + "' auto | Out-Null"); break;
+                case 3: Ps("& '" + Path.Combine(Root, "snu.exe") + "' clear | Out-Null"); break;
+                case 4: Ps("& nvidia-smi -pl 350 | Out-Null"); break;
+                case 5: Ps("Unregister-ScheduledTask -TaskName NvidiaUndervolt -Confirm:$false -ErrorAction SilentlyContinue"); break;
+                case 6:
+                    Ps("& '" + Path.Combine(Root, "snu.exe") + "' status | Out-Null");
+                    break;
+            }
+        });
+    }
+
+    private void InstallPersistence()
+    {
+        RunSteps("Reapplication au demarrage", new[]
+        {
+            "Creation de la tache planifiee",
+            "Installation du service de ventilation",
+            "Application immediate de la configuration"
+        }, i =>
+        {
+            switch (i)
+            {
+                case 0: Ps("& '" + Path.Combine(Root, "install-task.ps1") + "'"); break;
+                case 1: Ps("& '" + Path.Combine(Root, "install-fan-service.ps1") + "'"); break;
+                case 2:
+                    Ps("& '" + Path.Combine(Root, "apply-undervolt.ps1") + "'");
+                    break;
+            }
+        });
+    }
+
+    private int Section(Control parent, string title, int y, string[] keys)
     {
         var box = new GroupBox
         {
@@ -328,7 +634,7 @@ internal sealed class MainForm : Form
             _v[k] = lv;
             ky += 18;
         }
-        Controls.Add(box);
+        parent.Controls.Add(box);
         return y + box.Height + 8;
     }
 
@@ -352,7 +658,7 @@ internal sealed class MainForm : Form
             using (var p = Process.Start(psi))
             {
                 string o = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(4000);
+                p.WaitForExit(10000);
                 return o;
             }
         }
@@ -363,11 +669,16 @@ internal sealed class MainForm : Form
     {
         try
         {
-            string q = Run(Smi, "--query-gpu=name,driver_version,vbios_version,pci.bus_id,pci.device_id,pci.sub_device_id,memory.total,memory.used,clocks.current.graphics,clocks.current.memory,clocks.max.graphics,clocks.max.memory,power.draw,power.limit,temperature.gpu,utilization.gpu,fan.speed --format=csv,noheader,nounits");
+            string q = Run(Smi, "--query-gpu=name,driver_version,vbios_version,pci.bus_id,pci.device_id,pci.sub_device_id,memory.total,memory.used,clocks.current.graphics,clocks.current.memory,clocks.max.graphics,clocks.max.memory,power.draw,power.limit,temperature.gpu,utilization.gpu,fan.speed,pcie.link.gen.current,pcie.link.gen.max,pcie.link.width.current,pcie.link.width.max --format=csv,noheader,nounits");
             if (!string.IsNullOrWhiteSpace(q))
             {
                 string[] p = q.Trim().Split(',');
                 for (int i = 0; i < p.Length; i++) p[i] = p[i].Trim();
+                if (p.Length >= 21)
+                {
+                    _s.PcieGen = p[17] + " / max " + p[18];
+                    _s.PcieWidth = p[19] + " / max " + p[20];
+                }
                 if (p.Length >= 17)
                 {
                     _s.Name = p[0]; _s.Driver = p[1]; _s.Vbios = p[2]; _s.BusId = p[3];
@@ -454,6 +765,9 @@ internal sealed class MainForm : Form
                 else _s.Profile = "equilibre";
             }
 
+            ReadFreqProfile();
+            ReadVoltageInfo();
+
             string dump = Run(Path.Combine(Root, "snu.exe"), "curve");
             var mh = System.Text.RegularExpressions.Regex.Match(dump, @"831 mV\s*->\s*(\d+)\s*MHz");
             if (mh.Success) _s.Curve831 = mh.Groups[1].Value + " MHz";
@@ -465,6 +779,33 @@ internal sealed class MainForm : Form
     private static long ParseLong(string s) { double d; return double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out d) ? (long)d : 0; }
     private static double ParseDouble(string s) { double d; return double.TryParse(s, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out d) ? d : 0; }
 
+    private void ReadVoltageInfo()
+    {
+        try
+        {
+            string stock = Path.Combine(Root, "courbe-stock.json");
+            if (File.Exists(stock))
+            {
+                int min = int.MaxValue, max = int.MinValue;
+                foreach (Match m in Regex.Matches(File.ReadAllText(stock), "\"mv\"\\s*:\\s*(\\d+)"))
+                {
+                    int v = int.Parse(m.Groups[1].Value);
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                if (min != int.MaxValue) { _s.VoltMin = min + " mV"; _s.VoltMax = max + " mV"; }
+            }
+
+            string active = Path.Combine(Root, "plateau-active.json");
+            if (File.Exists(active))
+            {
+                var m = Regex.Match(File.ReadAllText(active), "\"mv\"\\s*:\\s*(\\d+)");
+                if (m.Success) _s.VoltPlateau = m.Groups[1].Value + " mV";
+            }
+        }
+        catch { }
+    }
+
     private void Render()
     {
         _lStatus.Text = _s.Name + "  |  " + _s.Driver;
@@ -475,6 +816,11 @@ internal sealed class MainForm : Form
         Set("Pilote", _s.Driver);
         Set("Bus PCI", _s.BusId);
         Set("Memoire video", (_s.VramTotal / 1024) + " Mo  (" + _s.VramUsed + " Mo utilises)");
+        Set("Tension min (courbe)", _s.VoltMin);
+        Set("Tension max (courbe)", _s.VoltMax);
+        Set("Tension du plateau", _s.VoltPlateau);
+        Set("Bus PCIe (version)", _s.PcieGen);
+        Set("Bus PCIe (largeur)", _s.PcieWidth);
 
         Set("Frequence GPU max", _s.ClockMax + " MHz");
         Set("Frequence memoire max", _s.MemClockMax + " MHz");
@@ -485,8 +831,19 @@ internal sealed class MainForm : Form
         Set("Ralentissement thermique", _s.TempSlowdown + " C");
 
         Set("Undervolt", _s.Undervolt);
-        Set("Power limit", _s.PowerLimit.ToString("0") + " W");
+        string plTxt = _s.PowerLimit.ToString("0") + " W";
+        if (Math.Abs(_s.PowerLimit - 320) > 1) plTxt += "  (configuration : 320 W)";
+        Set("Power limit", plTxt);
         Set("Profil ventilation", _s.Profile);
+        if (_profileBox != null && !_profileBox.Focused)
+        {
+            int idx = _profileBox.Items.IndexOf(_s.Profile);
+            if (idx >= 0 && idx != _profileBox.SelectedIndex)
+            {
+                _profileBox.SelectedIndexChanged -= (s2, e2) => { };
+                _profileBox.SelectedIndex = idx;
+            }
+        }
         Set("Courbe 831 mV", _s.Curve831);
 
         Set("Frequence GPU", _s.ClockNow + " MHz");
@@ -499,6 +856,8 @@ internal sealed class MainForm : Form
         Set("Ventilateur 1", _s.Fan1Rpm >= 0 ? (_s.Fan1Rpm + " tr/min  (" + _s.Fan1Pct + " %)") : "n/a");
         Set("Ventilateur 2", _s.Fan2Rpm >= 0 ? (_s.Fan2Rpm + " tr/min  (" + _s.Fan2Pct + " %)") : "n/a");
         Set("Charge GPU", _s.GpuUsage + " %");
+
+        UpdateSensors();
 
         try
         {
@@ -518,6 +877,14 @@ internal sealed class MainForm : Form
             Process.Start(psi);
         }
         catch (Exception e) { MessageBox.Show(e.Message, "Erreur"); }
+    }
+
+    private void OnProfileChanged()
+    {
+        if (_busy || _profileBox == null) return;
+        string name = _profileBox.SelectedItem as string;
+        if (string.IsNullOrEmpty(name)) return;
+        SetProfile(name);
     }
 
     private void SetProfile(string name)
@@ -540,7 +907,7 @@ internal static class Program
     }
 
     [STAThread]
-    private static void Main(string[] args)
+    private static int Main(string[] args)
     {
         AppDomain.CurrentDomain.UnhandledException += (o, e) => Log("UNHANDLED " + e.ExceptionObject);
         Application.ThreadException += (o, e) => Log("THREAD " + e.Exception);
@@ -548,10 +915,58 @@ internal static class Program
         Log("demarrage args=" + string.Join(" ", args));
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        bool hidden = false;
+        bool hidden = false, tune = false, check = false;
         foreach (string a in args)
+        {
             if (a == "--tray" || a == "/tray") hidden = true;
-        try { Application.Run(new MainForm(hidden)); Log("arret normal"); }
-        catch (Exception e) { Log("FATAL " + e); throw; }
+            if (a == "--autotune") tune = true;
+            if (a == "--check") check = true;
+        }
+
+        string root = File.Exists(@"C:\Nvidia\snu.exe") ? @"C:\Nvidia" : @"C:\ProgramData\NvidiaUndervolt";
+        var compat = Compatibility.Check(root);
+        Log("compatibilite : " + (compat.Ok ? "OK" : "NON") + " / " + compat.GpuName);
+
+        if (check)
+        {
+            MessageBox.Show(compat.Summary, "Compatibilite", MessageBoxButtons.OK,
+                compat.Ok ? MessageBoxIcon.Information : MessageBoxIcon.Error);
+            return compat.Ok ? 0 : 2;
+        }
+
+        if (MainForm.ConsumeCrashMarker(root))
+        {
+            Log("marqueur de test trouve : restauration d'origine");
+            try
+            {
+                Process.Start(new ProcessStartInfo(Path.Combine(root, "snu.exe"), "clear")
+                { UseShellExecute = false, CreateNoWindow = true }).WaitForExit(15000);
+                Process.Start(new ProcessStartInfo("nvidia-smi", "-pl 350")
+                { UseShellExecute = false, CreateNoWindow = true }).WaitForExit(15000);
+            }
+            catch { }
+            if (!tune && !hidden)
+            {
+                MessageBox.Show(
+                    "Un test d'optimisation a ete interrompu (probable instabilite du pilote).\n\n" +
+                    "La configuration d'origine a ete restauree automatiquement.\n" +
+                    "L'optimisation reprendra a un palier plus sur.",
+                    "Test interrompu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        if (!compat.Ok)
+        {
+            Log("refus : " + compat.Reason);
+            MessageBox.Show(
+                "Cette carte n'est pas compatible avec NVIDIA Configuration.\n\n" +
+                compat.Summary + "\n\n" +
+                "Le programme ne peut pas s'executer sur ce materiel.",
+                "Materiel incompatible", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 2;
+        }
+
+        try { Application.Run(new MainForm(hidden, tune)); Log("arret normal"); return 0; }
+        catch (Exception e) { Log("FATAL " + e); return 1; }
     }
 }

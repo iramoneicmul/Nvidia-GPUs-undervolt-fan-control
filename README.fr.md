@@ -250,6 +250,26 @@ matérielle. Charge mesurée : ~240 W. Python/PyTorch reste en repli automatique
 La zone basse (barre de progression, sélecteur de profil, boutons d'action)
 reste visible sous chaque onglet.
 
+### Onglet Capteurs et test des profils
+
+Un tableau temps réel façon GPU-Z affiche chaque valeur avec son minimum et son
+maximum depuis le démarrage : fréquences GPU/mémoire, tension, puissance, power
+limit, températures GPU/hotspot/mémoire, les deux ventilateurs (tr/min et %),
+charge GPU, mémoire utilisée, génération et largeur PCIe.
+
+Le bouton « Tester les profils de ventilation » applique successivement
+`silence`, `equilibre` et `froid`, lance 1 minute de charge pour chacun, relève
+le régime moyen/maximal et les températures maximales, écrit un rapport
+Markdown et restaure `equilibre`.
+
+### Limite connue
+
+Le noyau OpenCL naïf plafonne à **~240 W**, contre **~300 W** avec PyTorch : il
+est donc moins sévère. Un passage complet a déclaré tous les paliers stables
+jusqu'à 806 mV, alors que PyTorch avait détecté une instabilité à 818 mV.
+PyTorch reste donc le moteur prioritaire lorsqu'il est disponible, OpenCL
+servant de repli. La référence validée reste **831 mV**.
+
 ---
 
 ## Matériel / logiciel
