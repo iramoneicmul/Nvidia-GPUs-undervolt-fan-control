@@ -1,5 +1,5 @@
-[![Latest release](https://img.shields.io/github/v/release/iramoneicmul/rtx3080ti-undervolt-fan-control)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue)](https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control)
+[![Latest release](https://img.shields.io/github/v/release/iramoneicmul/Nvidia-GPUs-undervolt-fan-control)](https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-blue)](https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control)
 
 **English** | [Version française](README.fr.md) &middot; [Installation guide](INSTALL.md)
 
@@ -330,7 +330,7 @@ optimised / colour-coded gain) and the voltage tiers tested. Files:
 
 ## Download and installation
 
-**Latest release:** <https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest>
+**Latest release:** <https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest>
 
 ### Requirements
 

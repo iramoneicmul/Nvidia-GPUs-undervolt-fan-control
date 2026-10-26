@@ -17,7 +17,7 @@
 ## 2. Download
 
 Latest release:
-<https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control/releases/latest>
+<https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest>
 
 Download either:
 

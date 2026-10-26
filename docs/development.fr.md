@@ -166,7 +166,7 @@ gh release create v1.0.20 --title "NVIDIA Configuration 1.0.20 (FR/EN)" \
   --notes-file NOTES.md nvidiaconf.exe nvidiaconf.msi
 ```
 
-Dépôt : <https://github.com/iramoneicmul/rtx3080ti-undervolt-fan-control>
+Dépôt : <https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control>
 
 Mettre à jour les empreintes SHA-256 dans `README.md` et `README.fr.md`.
 
