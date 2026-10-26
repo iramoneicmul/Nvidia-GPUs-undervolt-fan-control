@@ -52,6 +52,30 @@ C:\Nvidia\nvidiaconf.exe --compare
 
 ---
 
+## Surveillance, historique et mise à jour
+
+- **Graphique temps réel** dans l'onglet Temps réel : température, puissance et
+  fréquence (150 points).
+- **Export CSV** des statistiques de capteurs (onglet Capteurs).
+- **Notifications** : température élevée (`TempSlowdown - 5 °C`) et mise à jour
+  disponible.
+- **Historique des configurations** avec restauration en un clic.
+- **Watchdog** : si l'application est tuée pendant un test, le service restaure
+  la courbe active et le power limit en quelques minutes.
+- **Profils de ventilation par application** via `C:\Nvidia\profiles-apps.json`.
+- **Vérification de version** au démarrage auprès de l'API GitHub.
+
+Un palier n'est déclaré stable que si **écarts = 0, erreurs CUDA = 0 et
+erreurs Xid = 0**. La recherche de tension utilise une **dichotomie** (4 tests
+au lieu de 7) et la fréquence maximale stable est recherchée à la tension
+retenue, par pas de 15 MHz. Le power limit est mesuré sur **10 minutes** de
+charge jeu avec une marge de +10 W.
+
+Tests de non-régression : `tools/test-regression.ps1` (19 contrôles).
+Signature des releases : `tools/sign-release.sh` (SHA256 + GPG facultatif).
+
+---
+
 ## Compatibilité
 
 L'application ne se base **pas** sur une liste de modèles : elle vérifie les
@@ -415,8 +439,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-734eb1a25716c26dcd1ea31a79aff4ffb1e52c9a84339084723755ca7ef4516b  nvidiaconf.exe
-83089e62013e43882ec52d1f1adac2538c9562853b0278da09544ff0919270d2  nvidiaconf.msi
+6a84de45747d093c87c9f392af456c947f2054b69874c225828b9952d78817d7  nvidiaconf.exe
+5b790c5f0e0c39cd5a94d49bd6887c301429de505f1f6b8bf7102354013d7c05  nvidiaconf.msi
 ```
 
 ### Premier lancement

@@ -376,3 +376,88 @@ Package - charge Lourde (4/4)  (~4 min restantes)
 | 1.0.45 | Bouton de comparaison + temps restant |
 | 1.0.46 | Profil de ventilation reporté dans le rapport |
 | 1.0.47 | Déclencheur `--compare` |
+
+---
+
+## 13. Les 15 améliorations (v1.1.0 → v1.3.0)
+
+### 13.1 Fiabilité
+
+| # | Amélioration | Implémentation |
+|---|---|---|
+| 1 | Erreurs CUDA | `stability.py` compte les exceptions CUDA (`erreurs=N`) ; intégrées au verdict |
+| 2 | Erreurs Xid | `CountXid()` lit le journal System, fournisseur `nvlddmkm` (ID 13, 31, 43, 153) sur la durée du test |
+| 3 | Restauration garantie | le service surveille `autotune-inprogress.json` ; au-delà de 4 min sans mise à jour, il réapplique `plateau-active.json` et le PL de `power-limit.txt` |
+| 4 | Sauvegarde horodatée | `backup/AAAAMMJJ-HHMMSS-package/` contient courbe, ventilation, profil de fréquences et PL |
+| 5 | Journal rotatif | `nvidiaconf.log` basculé en `.log.1` au-delà de 2 Mo |
+
+Un palier est déclaré stable seulement si **écarts = 0, erreurs CUDA = 0 et Xid = 0**.
+
+### 13.2 Pertinence
+
+| # | Amélioration | Implémentation |
+|---|---|---|
+| 6 | Dichotomie | 4 tests au lieu de 7 (référence haute + `log2(N)`), soit ~40 min au lieu de 70 |
+| 7 | Fréquence maximale | paliers de +15 MHz à tension fixée, 240 s par palier, arrêt au premier échec |
+| 8 | PL sur 10 min | `MeasureDetailed(py, 2048, 600)` puis marge +10 W |
+| 9 | Plancher de sécurité | tension retenue ≥ 88 % de la tension d'origine en charge |
+
+### 13.3 Ergonomie
+
+| # | Amélioration | Implémentation |
+|---|---|---|
+| 10 | Graphique temps réel | composant `MiniGraph` (température, watts, MHz), 150 points |
+| 11 | Export CSV | bouton dans l'onglet Capteurs → `export-AAAAMMJJ-HHMMSS.csv` |
+| 12 | Notifications | `NotifyIcon` : température ≥ `TempSlowdown − 5 °C`, mise à jour disponible |
+| 13 | Historique | `history.txt` (une ligne par configuration) + fenêtre avec restauration |
+
+### 13.4 Industrialisation
+
+| # | Amélioration | Implémentation |
+|---|---|---|
+| 14 | Vérification de version | `CheckForUpdates()` interroge l'API GitHub au démarrage ; notification + entrée de menu |
+| 15 | Non-régression et signature | `tools/test-regression.ps1` (19 contrôles) et `tools/sign-release.sh` (SHA256 + GPG) |
+
+### 13.5 Nouveaux fichiers d'exploitation
+
+| Fichier | Rôle |
+|---|---|
+| `power-limit.txt` | dernier PL appliqué, utilisé par le watchdog |
+| `history.txt` | historique des configurations (séparateur `\|`) |
+| `profiles-apps.json` | ventilation par application |
+| `backup/` | sauvegardes horodatées avant chaque test |
+| `export-*.csv` | export des statistiques de capteurs |
+| `comparatif-*.html` | rapports de comparaison origine / appliqué |
+
+### 13.6 Ventilation par application
+
+`C:\Nvidia\profiles-apps.json` :
+
+```json
+{
+  "cyberpunk2077.exe": "froid",
+  "bf2042.exe": "froid",
+  "notepad.exe": "silence"
+}
+```
+
+Le service vérifie toutes les 5 s si un de ces processus tourne et applique le
+profil correspondant (testé : « profil par application : froid »).
+
+### 13.7 Tests de non-régression
+
+```powershell
+powershell -ExecutionPolicy Bypass -File D:\opencode\test-regression.ps1
+```
+
+Couverture : fichiers installés, service et tâches, cohérence carte (PL,
+température), limites lues, taille du journal, génération du rapport, refus
+d'une consigne hors limites. Dernier passage : **19 OK, 0 échec**.
+
+### 13.8 Signature des releases
+
+```bash
+./sign-release.sh /chemin/vers/release
+```
+
+Produit `SHA256SUMS` et, si une clé GPG existe, `SHA256SUMS.asc`.

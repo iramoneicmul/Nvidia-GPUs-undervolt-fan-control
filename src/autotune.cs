@@ -375,6 +375,12 @@ internal sealed partial class MainForm
         return m.Success ? int.Parse(m.Groups[1].Value) : -1;
     }
 
+    private static int ParseErreurs(string res)
+    {
+        var m = Regex.Match(res ?? "", @"erreurs=(\d+)");
+        return m.Success ? int.Parse(m.Groups[1].Value) : 0;
+    }
+
     private void ApplyFinal(int mv, Dictionary<int, int> stock)
     {
         // la courbe retenue devient la courbe active

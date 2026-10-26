@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Threading;
@@ -755,11 +756,97 @@ internal sealed class FanCurveService : ServiceBase
         Log(root, "Service demarre.");
     }
 
+    private DateTime _lastMarkerCheck = DateTime.MinValue;
+    private DateTime _lastAppCheck = DateTime.MinValue;
+    private string _appProfile = "";
+
+    // Profils par application : "profiles-apps.json" associe un executable a un
+    // profil de ventilation (silence / equilibre / froid).
+    private void CheckAppProfiles(string root)
+    {
+        if ((DateTime.Now - _lastAppCheck).TotalSeconds < 5) return;
+        _lastAppCheck = DateTime.Now;
+        try
+        {
+            string cfg = Path.Combine(root, "profiles-apps.json");
+            if (!File.Exists(cfg)) return;
+
+            string json = File.ReadAllText(cfg);
+            string wanted = "";
+            foreach (System.Text.RegularExpressions.Match m in
+                     System.Text.RegularExpressions.Regex.Matches(json, @"""([^""]+\.exe)""\s*:\s*""([^""]+)"""))
+            {
+                string exe = m.Groups[1].Value;
+                if (exe.EndsWith(".exe")) exe = exe.Substring(0, exe.Length - 4);
+                string profil = m.Groups[2].Value;
+                if (Process.GetProcessesByName(exe).Length > 0) { wanted = profil; break; }
+            }
+
+            if (wanted == _appProfile) return;
+            _appProfile = wanted;
+            if (string.IsNullOrEmpty(wanted)) return;
+
+            string src = Path.Combine(root, "profil-" + wanted + ".txt");
+            if (File.Exists(src))
+            {
+                File.Copy(src, Path.Combine(root, "fan-curve.txt"), true);
+                Log(root, "profil par application : " + wanted);
+            }
+        }
+        catch (Exception e) { Log(root, "profiles-apps : " + e.Message); }
+    }
+
+    // Test interrompu (application tuee) : restaure la configuration active.
+    private void CheckInterruptedTest(string root)
+    {
+        if ((DateTime.Now - _lastMarkerCheck).TotalSeconds < 30) return;
+        _lastMarkerCheck = DateTime.Now;
+        try
+        {
+            string marker = Path.Combine(root, "autotune-inprogress.json");
+            if (!File.Exists(marker)) return;
+
+            var age = DateTime.Now - File.GetLastWriteTime(marker);
+            if (age.TotalMinutes < 4) return;   // test probablement encore en cours
+
+            Log(root, "test interrompu detecte (" + (int)age.TotalMinutes + " min) : restauration de la configuration active");
+
+            string plateau = Path.Combine(root, "plateau-active.json");
+            if (File.Exists(plateau))
+            {
+                var psi = new ProcessStartInfo(Path.Combine(root, "snu.exe"),
+                    "--in-tuning-file \"" + plateau + "\" --no-persist")
+                { UseShellExecute = false, CreateNoWindow = true };
+                using (var p = Process.Start(psi)) p.WaitForExit(25000);
+            }
+
+            string plFile = Path.Combine(root, "power-limit.txt");
+            if (File.Exists(plFile))
+            {
+                string txt = File.ReadAllText(plFile);
+                var m = System.Text.RegularExpressions.Regex.Match(txt, "(\\d+)");
+                if (m.Success)
+                {
+                    var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
+                        "-pl " + m.Groups[1].Value)
+                    { UseShellExecute = false, CreateNoWindow = true };
+                    using (var p = Process.Start(psi)) p.WaitForExit(15000);
+                }
+            }
+
+            try { File.Delete(marker); } catch { }
+            Log(root, "configuration active restauree apres interruption");
+        }
+        catch (Exception e) { Log(root, "watchdog : " + e.Message); }
+    }
+
     private void Loop()
     {
         while (!_stop)
         {
             _engine.Tick();
+            CheckInterruptedTest(Paths.Root);
+            CheckAppProfiles(Paths.Root);
             int ms = 2000;
             for (int i = 0; i < ms / 100 && !_stop; i++) Thread.Sleep(100);
         }

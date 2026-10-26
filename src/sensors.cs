@@ -25,6 +25,49 @@ internal sealed partial class MainForm
     private readonly Dictionary<string, double[]> _stats = new Dictionary<string, double[]>();
     private DataGridView _grid;
 
+    // ------------------------------------------------------------------
+    //  Graphique temps reel (temperature, puissance, frequence)
+    // ------------------------------------------------------------------
+    private void BuildLiveGraph(TabPage page, int y4)
+    {
+        _graph = new MiniGraph
+        {
+            Location = new Point(18, y4 + 14),
+            Size = new Size(566, 200),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        page.Controls.Add(_graph);
+    }
+
+    // ------------------------------------------------------------------
+    //  Export CSV des statistiques de capteurs
+    // ------------------------------------------------------------------
+    private void ExportCsv()
+    {
+        try
+        {
+            string path = Path.Combine(Root, "export-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".csv");
+            var sb = new StringBuilder();
+            sb.AppendLine("capteur;valeur;min;max");
+            foreach (string key in SensorNames)
+            {
+                if (!_stats.ContainsKey(key)) continue;
+                var st = _stats[key];
+                sb.AppendLine(string.Format("{0};{1:0.##};{2:0.##};{3:0.##}", key, st[0], st[1], st[2]));
+            }
+            File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+            LogMsg("export CSV : " + path);
+            MessageBox.Show("Export ecrit :\n" + path, "Export CSV",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception e)
+        {
+            LogMsg("export CSV : " + e.Message);
+            MessageBox.Show("Export impossible : " + e.Message, "Export CSV",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     private void BuildSensorsTab(TabPage page)
     {
         _grid = new DataGridView
@@ -67,6 +110,17 @@ internal sealed partial class MainForm
         }
 
         page.Controls.Add(_grid);
+
+        var exportBar = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 36,
+            BackColor = Color.FromArgb(28, 28, 28)
+        };
+        var btnCsv = MakeButton("Exporter CSV", 8, 4, 130);
+        btnCsv.Click += (o, e) => ExportCsv();
+        exportBar.Controls.Add(btnCsv);
+        page.Controls.Add(exportBar);
     }
 
     private void UpdateSensors()
@@ -302,5 +356,79 @@ internal sealed partial class MainForm
             _bar.Value = 100;
             _step.Text = "Test des profils termine (profil equilibre restaure).";
         });
+    }
+}
+
+
+/// <summary>Petit graphique temps reel : temperature, puissance, frequence.</summary>
+internal sealed class MiniGraph : Panel
+{
+    private readonly System.Collections.Generic.List<double> _temp = new System.Collections.Generic.List<double>();
+    private readonly System.Collections.Generic.List<double> _watts = new System.Collections.Generic.List<double>();
+    private readonly System.Collections.Generic.List<double> _mhz = new System.Collections.Generic.List<double>();
+
+    public MiniGraph()
+    {
+        DoubleBuffered = true;
+        BackColor = Color.FromArgb(20, 20, 20);
+        BorderStyle = BorderStyle.FixedSingle;
+    }
+
+    public void Add(double temp, double watts, double mhz)
+    {
+        _temp.Add(temp); _watts.Add(watts); _mhz.Add(mhz);
+        while (_temp.Count > 150)
+        {
+            _temp.RemoveAt(0); _watts.RemoveAt(0); _mhz.RemoveAt(0);
+        }
+        Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        var g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        using (var grid = new Pen(Color.FromArgb(40, 40, 40)))
+        {
+            for (int i = 1; i < 4; i++)
+            {
+                int y = Height * i / 4;
+                g.DrawLine(grid, 0, y, Width, y);
+            }
+        }
+
+        Draw(g, _temp, 100.0, Color.FromArgb(230, 120, 60));
+        Draw(g, _watts, 400.0, Color.FromArgb(120, 200, 80));
+        Draw(g, _mhz, 2100.0, Color.FromArgb(90, 160, 240));
+
+        using (var f = new Font("Consolas", 8f))
+        using (var b = new SolidBrush(Color.Gainsboro))
+        {
+            g.DrawString("temp", f, b, 6, 4);
+            using (var p = new SolidBrush(Color.FromArgb(230, 120, 60))) g.FillRectangle(p, 40, 6, 12, 8);
+            g.DrawString("W", f, b, 60, 4);
+            using (var p = new SolidBrush(Color.FromArgb(120, 200, 80))) g.FillRectangle(p, 76, 6, 12, 8);
+            g.DrawString("MHz", f, b, 96, 4);
+            using (var p = new SolidBrush(Color.FromArgb(90, 160, 240))) g.FillRectangle(p, 126, 6, 12, 8);
+        }
+    }
+
+    private void Draw(Graphics g, System.Collections.Generic.List<double> data, double scale, Color color)
+    {
+        if (data.Count < 2) return;
+        int pad = 12;
+        float w = Width - 2 * pad;
+        float h = Height - 2 * pad;
+        var pts = new System.Drawing.PointF[data.Count];
+        for (int i = 0; i < data.Count; i++)
+        {
+            float x = pad + w * i / (data.Count - 1);
+            double v = Math.Max(0, Math.Min(scale, data[i]));
+            float y = pad + (float)(h * (1.0 - v / scale));
+            pts[i] = new System.Drawing.PointF(x, y);
+        }
+        using (var pen = new Pen(color, 1.4f)) g.DrawLines(pen, pts);
     }
 }

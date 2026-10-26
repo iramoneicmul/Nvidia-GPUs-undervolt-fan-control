@@ -51,6 +51,28 @@ C:\Nvidia\nvidiaconf.exe --compare
 
 ---
 
+## Monitoring, history and updates
+
+- **Real-time graph** in the Live tab: temperature, power and frequency (150 points).
+- **CSV export** of sensor statistics (Sensors tab).
+- **Notifications**: high temperature (`TempSlowdown - 5 C`) and available updates.
+- **Configuration history** with one-click restore (Configuration tab).
+- **Watchdog**: if the app is killed during a test, the service restores the
+  active curve and power limit within a few minutes.
+- **Per-application fan profiles** via `C:\Nvidia\profiles-apps.json`.
+- **Version check** at startup against the GitHub releases API.
+
+Stability verdicts now require **zero numerical differences, zero CUDA errors
+and zero Xid driver errors**. Voltage search uses a **dichotomy** (4 tests
+instead of 7) and the maximum stable frequency is searched at the retained
+voltage, in 15 MHz steps. The power limit is measured over **10 minutes** of
+gaming load with a +10 W margin.
+
+Regression tests: `tools/test-regression.ps1` (19 checks).
+Release signing: `tools/sign-release.sh` (SHA256 + optional GPG).
+
+---
+
 ## Compatibility
 
 The application does **not** rely on a model list — it checks capabilities at
@@ -403,8 +425,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-734eb1a25716c26dcd1ea31a79aff4ffb1e52c9a84339084723755ca7ef4516b  nvidiaconf.exe
-83089e62013e43882ec52d1f1adac2538c9562853b0278da09544ff0919270d2  nvidiaconf.msi
+6a84de45747d093c87c9f392af456c947f2054b69874c225828b9952d78817d7  nvidiaconf.exe
+5b790c5f0e0c39cd5a94d49bd6887c301429de505f1f6b8bf7102354013d7c05  nvidiaconf.msi
 ```
 
 ### First run

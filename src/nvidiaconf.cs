@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -292,6 +293,8 @@ internal sealed partial class MainForm : Form
     private TextBox _targetMvBox;
     private TextBox _targetPlBox;
     private Label _boundsLabel;
+    private MiniGraph _graph;
+    private bool _tempAlert;
     public static int RequestedMv;
     public static int RequestedPowerLimit;
     private Label _lProfile;
@@ -351,6 +354,9 @@ internal sealed partial class MainForm : Form
             }
         };
         _tray.DoubleClick += (o, e) => { Show(); WindowState = FormWindowState.Normal; Activate(); };
+
+        var upd = new Thread(CheckForUpdates) { IsBackground = true };
+        upd.Start();
 
         _timer = new System.Windows.Forms.Timer { Interval = 2000 };
         _timer.Tick += (o, e) => Refresh(false);
@@ -562,6 +568,10 @@ internal sealed partial class MainForm : Form
         btnReport.Click += (o, e) => OpenComparativeReport();
         tConf.Controls.Add(btnReport);
 
+        var btnHistory = MakeButton("Historique des configurations", 288, y3 + 164, 250);
+        btnHistory.Click += (o, e) => ShowHistory();
+        tConf.Controls.Add(btnHistory);
+
         BuildSensorsTab(tSensors);
 
         var reportBar = new Panel
@@ -611,6 +621,7 @@ internal sealed partial class MainForm : Form
             "Temperature GPU", "Hotspot", "Temperature memoire",
             "Ventilateur 1", "Ventilateur 2", "Charge GPU"
         });
+        BuildLiveGraph(tLive, 8 + 10 * 21);
     }
 
     // Ligne de saisie : libelle, zone de texte, aide. Retourne la zone de texte.
@@ -705,6 +716,58 @@ internal sealed partial class MainForm : Form
         });
         th.IsBackground = true;
         th.Start();
+    }
+
+    // Verification de version aupres des releases GitHub (aucune installation
+    // automatique : simple notification).
+    private void CheckForUpdates()
+    {
+        try
+        {
+            var req = (HttpWebRequest)WebRequest.Create(
+                "https://api.github.com/repos/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest");
+            req.UserAgent = "nvidiaconf";
+            req.Timeout = 8000;
+            using (var resp = req.GetResponse())
+            using (var sr = new StreamReader(resp.GetResponseStream()))
+            {
+                string json = sr.ReadToEnd();
+                var m = Regex.Match(json, @"""tag_name""\s*:\s*""v?([0-9.]+)""");
+                if (!m.Success) return;
+
+                string latest = m.Groups[1].Value;
+                string current = Application.ProductVersion;
+                LogMsg("version : actuelle " + current + ", derniere publiee " + latest);
+                if (string.Compare(latest, current, true) > 0)
+                {
+                    LogMsg("mise a jour disponible : " + latest);
+                    try
+                    {
+                        _tray.ShowBalloonTip(10000, "Mise a jour disponible",
+                            "NVIDIA Configuration " + latest + " est disponible (version installee : " + current + ").",
+                            ToolTipIcon.Info);
+                        menu_UpdateItem(latest);
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch (Exception e) { LogMsg("verification de version : " + e.Message); }
+    }
+
+    private void menu_UpdateItem(string latest)
+    {
+        try
+        {
+            if (_tray.ContextMenuStrip == null) return;
+            if (_tray.ContextMenuStrip.Items.ContainsKey("maj")) return;
+            var item = new ToolStripMenuItem("Mise a jour " + latest + " disponible");
+            item.Name = "maj";
+            item.Click += (o, e) => Process.Start(
+                "https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest");
+            _tray.ContextMenuStrip.Items.Insert(0, item);
+        }
+        catch { }
     }
 
     private void Ui(Action a)
@@ -931,6 +994,27 @@ internal sealed partial class MainForm : Form
             string v = Run(Path.Combine(Root, "snu.exe"), "voltage");
             var mt = System.Text.RegularExpressions.Regex.Match(v, @"(\d+)\s*mV");
             if (mt.Success) _s.VoltageMv = int.Parse(mt.Groups[1].Value);
+
+            // graphique temps reel
+            if (_graph != null) _graph.Add(_s.Temp, _s.PowerNow, _s.ClockNow);
+
+            // alerte de temperature
+            if (_s.TempSlowdown > 0 && _s.Temp >= _s.TempSlowdown - 5)
+            {
+                if (!_tempAlert)
+                {
+                    _tempAlert = true;
+                    try
+                    {
+                        _tray.ShowBalloonTip(8000, "Temperature elevee",
+                            "GPU a " + _s.Temp + " C (seuil de ralentissement : " + _s.TempSlowdown + " C).",
+                            ToolTipIcon.Warning);
+                    }
+                    catch { }
+                    LogMsg("alerte temperature : " + _s.Temp + " C");
+                }
+            }
+            else if (_s.TempSlowdown > 0 && _s.Temp < _s.TempSlowdown - 12) _tempAlert = false;
 
             if (full)
             {
@@ -1246,7 +1330,19 @@ internal static class Program
 {
     private static void Log(string msg)
     {
-        try { File.AppendAllText(@"C:\Nvidia\nvidiaconf.log", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + msg + Environment.NewLine); } catch { }
+        try
+        {
+            string path = @"C:\Nvidia\nvidiaconf.log";
+            var fi = new FileInfo(path);
+            if (fi.Exists && fi.Length > 2 * 1024 * 1024)
+            {
+                string old = path + ".1";
+                try { if (File.Exists(old)) File.Delete(old); } catch { }
+                try { File.Move(path, old); } catch { }
+            }
+            File.AppendAllText(path, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + msg + Environment.NewLine);
+        }
+        catch { }
     }
 
     private static Mutex _mutex;

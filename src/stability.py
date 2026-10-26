@@ -16,14 +16,24 @@ torch.cuda.synchronize()
 
 n = 0
 bad = 0
+cuda_errors = 0
 maxdiff = 0.0
 t0 = time.time()
 
 print("stabilite:", duree, "s /", taille, "x", taille, flush=True)
 while time.time() - t0 < duree:
-    for _ in range(15):
-        c = a @ b
+    try:
+        for _ in range(15):
+            c = a @ b
         torch.cuda.synchronize()
+    except Exception as e:
+        # erreur CUDA = preuve d'instabilite (plus fiable qu'un ecart numerique)
+        cuda_errors += 1
+        try:
+            torch.cuda.synchronize()
+        except Exception:
+            pass
+        continue
     # charge graphique en alternance
     y = torch.nn.functional.conv2d(x, w, padding=1)
     torch.cuda.synchronize()
@@ -35,7 +45,7 @@ while time.time() - t0 < duree:
         if d > maxdiff:
             maxdiff = d
 
-res = f"RESULTAT iterations={n} ecarts={bad} maxdiff={maxdiff:.6f}"
+res = f"RESULTAT iterations={n} ecarts={bad} maxdiff={maxdiff:.6f} erreurs={cuda_errors}"
 print(res, flush=True)
 if len(sys.argv) > 2:
     try:

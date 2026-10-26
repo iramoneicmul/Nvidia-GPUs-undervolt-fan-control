@@ -17,6 +17,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Drawing;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
@@ -62,6 +63,154 @@ internal sealed partial class MainForm
     // ------------------------------------------------------------------
     //  Bornes de saisie, deduites des caracteristiques de la carte
     // ------------------------------------------------------------------
+    // Sauvegarde horodatee de la configuration courante avant chaque test.
+    // Compte les erreurs Xid du pilote NVIDIA depuis une date donnee : une
+    // seule suffit a considerer le palier instable.
+    private static int CountXid(DateTime since)
+    {
+        try
+        {
+            string cmd = "Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='nvlddmkm'; StartTime='" +
+                         since.ToString("yyyy-MM-ddTHH:mm:ss") + "'} -ErrorAction SilentlyContinue | " +
+                         "Where-Object { $_.Id -in 13,31,43,153 } | Measure-Object | Select-Object -Expand Count";
+            string o = RunCapture("powershell.exe", "-NoProfile -Command \"" + cmd + "\"", 15000);
+            int n;
+            return int.TryParse(o.Trim(), out n) ? n : 0;
+        }
+        catch { return 0; }
+    }
+
+    // ------------------------------------------------------------------
+    //  Historique des configurations appliquees
+    // ------------------------------------------------------------------
+    private void AppendHistory(int mhz, int mv, int pl, string profile)
+    {
+        try
+        {
+            string line = string.Join("|", new[]
+            {
+                DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                mhz.ToString(), mv.ToString(), pl.ToString(), profile ?? "",
+                Path.Combine(Root, "plateau-active.json"),
+                Path.Combine(Root, "fan-curve.txt")
+            });
+            File.AppendAllText(Path.Combine(Root, "history.txt"), line + Environment.NewLine);
+        }
+        catch { }
+    }
+
+    private void ShowHistory()
+    {
+        var form = new Form
+        {
+            Text = "Historique des configurations",
+            ClientSize = new Size(720, 380),
+            StartPosition = FormStartPosition.CenterParent,
+            BackColor = Color.FromArgb(24, 24, 24),
+            ForeColor = Color.Gainsboro,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false
+        };
+
+        var grid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            RowHeadersVisible = false,
+            BackgroundColor = Color.FromArgb(24, 24, 24),
+            ForeColor = Color.Gainsboro,
+            GridColor = Color.FromArgb(45, 45, 45),
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        };
+        grid.Columns.Add("date", "Date");
+        grid.Columns.Add("mhz", "MHz");
+        grid.Columns.Add("mv", "mV");
+        grid.Columns.Add("pl", "Power limit");
+        grid.Columns.Add("profile", "Ventilation");
+
+        var lines = new List<string[]>();
+        try
+        {
+            string path = Path.Combine(Root, "history.txt");
+            if (File.Exists(path))
+            {
+                foreach (string l in File.ReadAllLines(path))
+                {
+                    var parts = l.Split('|');
+                    if (parts.Length >= 5) lines.Add(parts);
+                }
+            }
+        }
+        catch { }
+
+        for (int i = lines.Count - 1; i >= 0; i--)
+        {
+            var p = lines[i];
+            grid.Rows.Add(new object[] { p[0], p[1], p[2], p[3] + " W", p[4] });
+        }
+
+        var bar = new Panel { Dock = DockStyle.Bottom, Height = 44, BackColor = Color.FromArgb(28, 28, 28) };
+        var btnClose = new Button { Text = "Fermer", Location = new Point(610, 8), Size = new Size(100, 28) };
+        btnClose.Click += (o, e) => form.Close();
+        var btnRestore = new Button { Text = "Restaurer la selection", Location = new Point(400, 8), Size = new Size(200, 28) };
+        btnRestore.Click += (o, e) =>
+        {
+            if (grid.SelectedRows.Count == 0) return;
+            int idx = grid.SelectedRows[0].Index;
+            int real = lines.Count - 1 - idx;
+            if (real < 0 || real >= lines.Count) return;
+            var p = lines[real];
+            try
+            {
+                string plateau = p.Length > 5 ? p[5] : Path.Combine(Root, "plateau-active.json");
+                if (File.Exists(plateau))
+                {
+                    File.Copy(plateau, Path.Combine(Root, "plateau-active.json"), true);
+                    ApplyTuning(Path.Combine(Root, "plateau-active.json"));
+                }
+                int plv;
+                if (p.Length > 3 && int.TryParse(p[3], out plv))
+                    Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + plv + " | Out-Null");
+                if (p.Length > 4 && !string.IsNullOrEmpty(p[4]))
+                    try { File.Copy(Path.Combine(Root, "profil-" + p[4] + ".txt"), Path.Combine(Root, "fan-curve.txt"), true); } catch { }
+                LogMsg("historique : restauration " + p[0]);
+                form.Close();
+            }
+            catch (Exception ex) { LogMsg("historique restauration : " + ex.Message); }
+        };
+        bar.Controls.Add(btnRestore);
+        bar.Controls.Add(btnClose);
+
+        form.Controls.Add(grid);
+        form.Controls.Add(bar);
+        form.ShowDialog(this);
+    }
+
+    private void BackupBeforeTest(string reason)
+    {
+        try
+        {
+            string dir = Path.Combine(Root, "backup", DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + reason);
+            Directory.CreateDirectory(dir);
+            foreach (string f in new[] { "plateau-active.json", "fan-curve.txt", "freq-profile.json" })
+            {
+                string src = Path.Combine(Root, f);
+                if (File.Exists(src)) File.Copy(src, Path.Combine(dir, f), true);
+            }
+            try
+            {
+                string pl = SmiDouble("power.limit").ToString("0");
+                File.WriteAllText(Path.Combine(dir, "power-limit.txt"), pl + " W\n");
+            }
+            catch { }
+            LogMsg("sauvegarde avant test : " + dir);
+        }
+        catch (Exception e) { LogMsg("sauvegarde avant test : " + e.Message); }
+    }
+
     private void ComputeTargetBounds(out int mhzMin, out int mhzMax,
                                      out int mvMin, out int mvMax,
                                      out int plMin, out int plMax)
@@ -286,6 +435,8 @@ internal sealed partial class MainForm
             return;
         }
 
+        BackupBeforeTest("package");
+
         var curve = ReadStockCurve();
         var cands = new List<int>();
         foreach (var kv in curve) if (kv.Key >= 806 && kv.Key <= 843) cands.Add(kv.Key);
@@ -328,62 +479,141 @@ internal sealed partial class MainForm
         }
         else
         {
-            for (int i = 0; i < cands.Count; i++)
+            // Recherche par dichotomie : ~log2(N) tests au lieu de N.
+            var asc = new List<int>(cands);
+            asc.Sort();   // croissant
+
+            Func<int, bool> trial = (mv) =>
             {
-                int mv = cands[i];
-                int idx = i;
-                UiProgress(string.Format("Tension {0} mV ({1}/{2})", mv, idx + 1, cands.Count),
-                    22 + (int)(55.0 * idx / cands.Count),
-                    Math.Max(1, (cands.Count - idx) * (StabilitySeconds + 40) / 60));
+                UiProgress(string.Format("Tension {0} mV", mv),
+                    22 + (int)(55.0 * Math.Max(0, asc.IndexOf(mv)) / asc.Count),
+                    Math.Max(1, 3 * (StabilitySeconds + 40) / 60));
 
                 WriteMarker(mv);
                 WritePlateau(mv, curve);
                 ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
 
-                // PyTorch est plus severe qu'OpenCL : priorite pour la securite.
-                string res = (ResolvePython() != null)
-                    ? RunPythonStability()
-                    : (OpenClTest.Available ? OpenClTest.Run(StabilitySeconds, 2048, null) : "aucun moteur");
-
+                DateTime t0 = DateTime.Now;
+                string res = (ResolvePython() != null) ? RunPythonStability() : "aucun moteur";
                 int ecarts = ParseEcarts(res);
-                LogMsg(string.Format("package tension {0} mV -> {1}", mv, res.Replace("\n", " ")));
+                int errs = ParseErreurs(res);
+                int xid = CountXid(t0);
+                bool ok = ecarts == 0 && errs == 0 && xid == 0;
+
+                LogMsg(string.Format("package tension {0} mV -> {1} (xid={2})", mv, res.Replace("\n", " "), xid));
                 rows.Add(string.Format("| {0} | {1} | {2} |", mv,
-                    res.Replace("|", "/"), ecarts == 0 ? "stable" : "**echec**"));
+                    res.Replace("|", "/") + (xid > 0 ? " / Xid=" + xid : ""),
+                    ok ? "stable" : "**echec**"));
 
                 if (res.Contains("aucun moteur") || res.Contains("aucun resultat"))
                 {
                     LogMsg("package : moteur muet, arret de la recherche");
-                    Ui(() => { _step.Text = "Moteur de test muet - recherche interrompue."; });
+                    UiProgress("Moteur de test muet - recherche interrompue", 75, 0);
                     ClearMarker();
-                    return;
+                    return false;
                 }
+                return ok;
+            };
 
-                if (ecarts == 0) lastOk = mv;
-                else { firstFail = mv; break; }
+            int lo = 0, hi = asc.Count - 1;
+            lastOk = -1;
+            if (trial(asc[hi])) { lastOk = asc[hi]; hi--; }
+            else { lo = asc.Count; }
+
+            while (lo <= hi)
+            {
+                int mid = (lo + hi) / 2;
+                if (trial(asc[mid])) { lastOk = asc[mid]; hi = mid - 1; }
+                else { lo = mid + 1; if (firstFail < 0) firstFail = asc[mid]; }
             }
 
-            mvRetained = lastOk;
-            int okIndex = cands.IndexOf(lastOk);
-            if (okIndex > 0) mvRetained = cands[okIndex - 1];
+            if (lastOk < 0)
+            {
+                LogMsg("package : aucune tension stable dans la plage testee");
+                UiProgress("Aucune tension stable - arret", 75, 0);
+                ClearMarker();
+                if (Environment.UserInteractive)
+                    MessageBox.Show("Aucune tension de la plage testee n'est stable.\nLa configuration d'origine est conservee.",
+                        "Tension", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
-            // Marge de securite : un test court ne peut pas detecter une
-            // instabilite tres rare (2 ecarts sur 28 000 iterations mesurees
-            // manuellement) : on applique 3 % de marge, soit ~4 pas.
-            int margin = (int)Math.Ceiling(lastOk * 0.03 / 6.25) * 6;
-            int safe = lastOk + Math.Max(6, margin);
-            int hi = 0;
-            foreach (int c in cands) if (c > hi) hi = c;
-            if (safe > hi) safe = hi;
+            // Marge : un pas au-dessus du dernier palier stable.
+            int idxOk = asc.IndexOf(lastOk);
+            mvRetained = (idxOk + 1 < asc.Count) ? asc[idxOk + 1] : lastOk;
 
-            // La courbe n'accepte que des paliers de 6,25 mV : on arrondit au
-            // palier superieur ou egal, jamais en dessous de la marge.
-            int rounded = hi;
-            foreach (int c in cands) if (c >= safe && c < rounded) rounded = c;
-            if (rounded > mvRetained) mvRetained = rounded;
-            LogMsg(string.Format("package : derniere tension stable {0} mV -> marge 3 % -> {1} mV", lastOk, mvRetained));
+            // Garde-fou : ne jamais descendre de plus de 12 % sous la tension
+            // d'origine sous charge (limite constatee sur ce type de GPU).
+            int origineMv = stock.ContainsKey("jeu") ? stock["jeu"].Mv : 0;
+            if (origineMv > 0)
+            {
+                int floorMv = (int)Math.Ceiling(origineMv * 0.88);
+                int rounded = asc[asc.Count - 1];
+                foreach (int c in asc) if (c >= floorMv) { rounded = c; break; }
+                if (mvRetained < rounded) mvRetained = rounded;
+                LogMsg(string.Format("package : plancher de securite {0} mV (origine en charge {1} mV) -> retenu {2} mV",
+                    rounded, origineMv, mvRetained));
+            }
+
+            LogMsg(string.Format("package : dernier palier stable {0} mV -> retenu {1} mV", lastOk, mvRetained));
         }
         ClearMarker();
         LogMsg("package : tension retenue " + mvRetained + " mV");
+
+        // ---------- 3bis) frequence maximale stable a cette tension ----------
+        int targetMhz = target;
+        if (RequestedMhz > 0)
+        {
+            targetMhz = TargetMhz;
+        }
+        else
+        {
+            int baseMhz = curve.ContainsKey(mvRetained) ? curve[mvRetained] : TargetMhz;
+            if (baseMhz <= 0) baseMhz = TargetMhz;
+            baseMhz = (int)(baseMhz / 15.0) * 15;
+            int best = baseMhz;
+            int maxMhz = _s.ClockMax > 0 ? _s.ClockMax : baseMhz + 120;
+
+            UiProgress(string.Format("Frequence de reference {0} MHz a {1} mV", baseMhz, mvRetained), 68, 4);
+            TargetMhz = baseMhz;
+            WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
+            ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
+            var tb = DateTime.Now;
+            string rb = RunPythonStability(240);
+            bool okBase = ParseEcarts(rb) == 0 && ParseErreurs(rb) == 0 && CountXid(tb) == 0;
+            LogMsg(string.Format("package frequence {0} MHz (reference) -> {1}", baseMhz, rb.Replace("\n", " ")));
+
+            if (okBase)
+            {
+                for (int step = 1; step <= 4; step++)
+                {
+                    int mhz = baseMhz + step * 15;
+                    if (mhz > maxMhz) break;
+                    UiProgress(string.Format("Frequence {0} MHz a {1} mV", mhz, mvRetained),
+                        70 + step * 2, Math.Max(1, (5 - step) * 5));
+
+                    TargetMhz = mhz;
+                    WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
+                    ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
+                    var t0 = DateTime.Now;
+                    string r = RunPythonStability(240);
+                    int e = ParseEcarts(r), er = ParseErreurs(r), xid = CountXid(t0);
+                    bool ok = e == 0 && er == 0 && xid == 0;
+                    LogMsg(string.Format("package frequence {0} MHz -> {1} (xid={2})", mhz, r.Replace("\n", " "), xid));
+                    if (ok) best = mhz; else break;
+                }
+            }
+            else
+            {
+                LogMsg("package : la frequence de reference est instable, retour a la valeur d'origine");
+                best = Math.Min(baseMhz, TargetMhz);
+            }
+
+            TargetMhz = best;
+            targetMhz = best;
+            target = best;
+            LogMsg("package : frequence retenue " + best + " MHz a " + mvRetained + " mV");
+        }
 
         // application provisoire pour determiner le power limit
         WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-active.json"));
@@ -392,8 +622,9 @@ internal sealed partial class MainForm
         Thread.Sleep(3000);
 
         // ---------- 4) power limit ----------
-        UiProgress("Determination du power limit (mesure en jeu)", 80, 3);
-        var jeu = MeasureDetailed(py, 2048, 45);
+        // Mesure longue (10 min) : une pointe courte sous-estime la consommation.
+        UiProgress("Determination du power limit (mesure en jeu 10 min)", 80, 11);
+        var jeu = MeasureDetailed(py, 2048, 600);
 
         // Marge de securite : +10 W au-dessus de la consommation reelle en jeu,
         // arrondie au pas de 10 W. Exemple valide : 309 W -> 320 W.
@@ -406,6 +637,7 @@ internal sealed partial class MainForm
         LogMsg(string.Format("package : conso jeu {0:0.0} W, marge +10 W -> {1} W (plafond carte {2} W)",
             jeu.Watts, pl, plOrigin));
         Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + pl + " | Out-Null");
+        try { File.WriteAllText(Path.Combine(Root, "power-limit.txt"), pl + " W\n"); } catch { }
         LogMsg("package : consommation en jeu " + jeu.Watts.ToString("0.0") + " W -> power limit " + pl + " W");
 
         // ventilation : profil equilibre
@@ -438,6 +670,7 @@ internal sealed partial class MainForm
         }
 
         // ---------- 6) rapport ----------
+        AppendHistory(target, mvRetained, pl, _fanProfileChosen);
         WritePackageReport(stock, opti, target, mvRetained, pl, rows, firstFail);
         Ui(() => { _bar.Value = 100; _step.Text = "Package optimal applique et verifie."; });
     }
@@ -575,8 +808,9 @@ internal sealed partial class MainForm
         return 0;
     }
 
-    private string RunPythonStability()
+    private string RunPythonStability(int seconds = -1)
     {
+        if (seconds < 0) seconds = StabilitySeconds;
         try
         {
             string py = ResolvePython();
@@ -584,9 +818,9 @@ internal sealed partial class MainForm
             string outFile = Path.Combine(Root, "package-stability.txt");
             try { File.Delete(outFile); } catch { }
             var psi = new ProcessStartInfo(py,
-                "\"C:\\Nvidia\\stability.py\" " + StabilitySeconds + " \"" + outFile + "\"")
+                "\"C:\\Nvidia\\stability.py\" " + seconds + " \"" + outFile + "\"")
             { UseShellExecute = false, CreateNoWindow = true };
-            using (var p = Process.Start(psi)) p.WaitForExit((StabilitySeconds + 40) * 1000);
+            using (var p = Process.Start(psi)) p.WaitForExit((seconds + 40) * 1000);
             try { return File.ReadAllText(outFile).Trim(); } catch { return "aucun resultat"; }
         }
         catch { return "erreur"; }
