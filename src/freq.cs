@@ -104,9 +104,25 @@ internal sealed partial class MainForm
 
     private int MeasureLevel(string py, int size)
     {
-        // Charge sans dependance : noyau OpenCL si disponible.
+        // Charge representative : PyTorch (matmul dense) est plus severe
+        // qu'OpenCL et evite de mesurer une carte non bridee.
         Thread load = null;
-        if (OpenClTest.Available)
+        if (py != null)
+        {
+            load = new Thread(() =>
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo(py, "\"C:\\Nvidia\\stress-long.py\" 65 " + size)
+                    { UseShellExecute = false, CreateNoWindow = true };
+                    using (var p = Process.Start(psi)) p.WaitForExit(75000);
+                }
+                catch { }
+            });
+            load.IsBackground = true;
+            load.Start();
+        }
+        else if (OpenClTest.Available)
         {
             load = new Thread(() => { OpenClTest.Run(65, 2048, null); });
             load.IsBackground = true;

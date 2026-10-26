@@ -35,6 +35,7 @@ files = [
     ("sensors.cs", "SensorsSource"),
     ("report.cs", "ReportSource"),
     ("stability.py", "StabilityScript"),
+    ("stress-long.py", "StressLong"),
     ("plateau-active.json", "CurveNow"),
     ("README.txt", "Readme"),
     ("setup-choice.ps1", "SetupChoice"),
