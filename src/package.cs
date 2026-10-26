@@ -189,6 +189,32 @@ internal sealed partial class MainForm
         form.ShowDialog(this);
     }
 
+    // Restaure la configuration active (courbe + power limit) apres un echec.
+    private void RestoreActiveSafe()
+    {
+        try
+        {
+            string plateau = Path.Combine(Root, "plateau-active.json");
+            if (File.Exists(plateau)) ApplyTuning(plateau);
+
+            int pl = 320;
+            try
+            {
+                string f = Path.Combine(Root, "power-limit.txt");
+                if (File.Exists(f))
+                {
+                    var m = Regex.Match(File.ReadAllText(f), @"(\d+)");
+                    if (m.Success) pl = int.Parse(m.Groups[1].Value);
+                }
+            }
+            catch { }
+
+            Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + pl + " | Out-Null");
+            LogMsg("restauration automatique apres echec : " + pl + " W");
+        }
+        catch (Exception e) { LogMsg("restauration automatique : " + e.Message); }
+    }
+
     private void BackupBeforeTest(string reason)
     {
         try
@@ -364,7 +390,12 @@ internal sealed partial class MainForm
         var th = new Thread(() =>
         {
             try { DoPackage(); }
-            catch (Exception e) { LogMsg("DoPackage " + e); Ui(() => { _step.Text = "Echec : " + e.Message; }); }
+            catch (Exception e)
+            {
+                LogMsg("DoPackage " + e);
+                RestoreActiveSafe();
+                Ui(() => { _step.Text = "Echec : " + e.Message + " (configuration restauree)"; });
+            }
             finally
             {
                 Ui(() =>
@@ -592,13 +623,13 @@ internal sealed partial class MainForm
         // des pas qui n'ont pas ete testes par la recherche.
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            UiProgress(string.Format("Verification de la tension retenue {0} mV", mvRetained), 76, 5);
+            UiProgress(string.Format("Verification de la tension retenue {0} mV", mvRetained), 76, 11);
             TargetMhz = target;
             WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
             ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
 
             var tCheck = DateTime.Now;
-            string rCheck = RunPythonStability(240);
+            string rCheck = RunPythonStability();   // meme duree que la recherche
             bool okCheck = ParseEcarts(rCheck) == 0 && ParseErreurs(rCheck) == 0 && CountXid(tCheck) == 0;
             LogMsg(string.Format("package verification {0} mV -> {1} (ok={2})",
                 mvRetained, rCheck.Replace("\n", " "), okCheck));
@@ -909,7 +940,7 @@ internal sealed partial class MainForm
         sb.AppendLine((Lang.French ? "| Frequence cible | **" : "| Target frequency | **") + target + " MHz** |");
         sb.AppendLine((Lang.French ? "| Tension | **" : "| Voltage | **") + mv + " mV** |");
         sb.AppendLine("| Power limit | **" + pl + " W** |");
-        sb.AppendLine((Lang.French ? "| Ventilation | **" : "| Cooling | **") + _fanProfileChosen + "** |");
+        sb.AppendLine((Lang.French ? "| Ventilation | **" : "| Cooling | **") + Lang.Profile(_fanProfileChosen) + "** |");
         sb.AppendLine();
         sb.AppendLine(Lang.French ? "## Comparatif par niveau de charge" : "## Comparison by load level");
         sb.AppendLine();

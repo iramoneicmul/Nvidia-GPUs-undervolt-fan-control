@@ -617,3 +617,46 @@ service    : Running
 backup     : 3 dossiers
 erreurs    : aucune
 ```
+
+---
+
+## 17. Derniers bugs corrigés (v1.9.3 / 1.9.4)
+
+| # | Bug | Correction |
+|---|---|---|
+| 10 | **Bouton « Appliquer » incohérent** : il réécrivait 320 W et la courbe de référence en dur, sans mettre à jour `power-limit.txt` ni l'historique | applique `plateau-active.json` et le PL mémorisé ; met à jour le fichier et l'historique |
+| 11 | **Aucune restauration sur échec** : une exception laissait la carte dans l'état du dernier palier testé | `RestoreActiveSafe()` appelée depuis le `catch` du package et de la comparaison |
+| 12 | **Durées incohérentes** : recherche de tension sur 600 s, vérification de la marge sur 240 s | vérification alignée sur 600 s |
+| 13 | **Profils non traduits** dans les rapports (`silence`, `equilibre`, `froid`) | `Lang.Profile()` → `quiet`, `balanced`, `cool` |
+| 14 | **Derniers messages en français** (notification, épinglage) | traduits |
+
+### 17.1 Conséquence du bug 10
+
+`power-limit.txt` sert au watchdog du service. Comme « Appliquer » ne l'écrivait
+pas, un test interrompu pouvait restaurer un power limit obsolète (par exemple
+350 W au lieu de 320 W). Le fichier est désormais systématiquement mis à jour,
+par le package comme par le bouton.
+
+### 17.2 État final vérifié (v1.9.4)
+
+```
+version    : 1.9.4.0
+signature  : Valid (Authenticode, certificat auto-signe)
+langue     : en (par defaut)
+courbe     : 1845 MHz / 831 mV
+power limit: 320 W
+ventilateur: 0 % (mode 0 dB au repos)
+service    : Running
+backup     : 3 dossiers
+erreurs    : aucune
+```
+
+### 17.3 Limites assumées (ce ne sont pas des bugs)
+
+| Limite | Raison |
+|---|---|
+| SmartScreen peut avertir au premier lancement | certificat auto-signé, pas d'autorité reconnue |
+| Wizard d'analyse long (~2 h) | 5 paliers de 10 min + vérification 10 min + 12 paliers de fréquence + 10 min de power limit |
+| Journal technique en français | choix de lisibilité pour le dépannage |
+| Mono-GPU | l'outil pilote la première carte renvoyée par NVAPI |
+| Mise à jour non automatique | notification + lien seulement, par choix de sécurité |

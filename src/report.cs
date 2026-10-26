@@ -44,7 +44,8 @@ internal sealed partial class MainForm
             catch (Exception e)
             {
                 LogMsg("RunComparison " + e);
-                Ui(() => { _step.Text = "Echec de la comparaison : " + e.Message; });
+                RestoreActiveSafe();
+                Ui(() => { _step.Text = "Echec de la comparaison : " + e.Message + " (configuration restauree)"; });
             }
             finally
             {
@@ -177,7 +178,7 @@ internal sealed partial class MainForm
         sb.AppendLine("<tr><td>Undervolt</td><td>" + Esc(_s.Undervolt) + "</td></tr>");
         sb.AppendLine("<tr><td>" + B("Tension du plateau", "Plateau voltage") + "</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
         sb.AppendLine("<tr><td>Power limit</td><td>" + _s.PowerLimit.ToString("0") + " W</td></tr>");
-        sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(_s.Profile) + "</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(Lang.Profile(_s.Profile)) + "</td></tr>");
         sb.AppendLine("</table>");
 
         sb.AppendLine("<p class=\"meta\">" + B("Charges PyTorch de 60 s par niveau. Les gains positifs (vert) sont favorables a la configuration appliquee.",
@@ -275,7 +276,7 @@ internal sealed partial class MainForm
         sb.AppendLine("<tr><td>Undervolt</td><td>" + Esc(_s.Undervolt) + "</td></tr>");
         sb.AppendLine("<tr><td>" + B("Tension du plateau", "Plateau voltage") + "</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
         sb.AppendLine("<tr><td>Power limit</td><td>" + _s.PowerLimit.ToString("0") + " W</td></tr>");
-        sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(_s.Profile) + "</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(Lang.Profile(_s.Profile)) + "</td></tr>");
         sb.AppendLine("<tr><td>Moteur de test</td><td>" + Esc(_s.Torch) + " (PyTorch) / OpenCL integre</td></tr>");
         sb.AppendLine("</table>");
 

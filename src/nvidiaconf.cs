@@ -845,25 +845,43 @@ internal sealed partial class MainForm : Form
 
     private void ApplyConfig()
     {
-        RunSteps("Application de la configuration", new[]
+        // Configuration active si elle existe, sinon la reference.
+        string plateau = Path.Combine(Root, "plateau-active.json");
+        if (!File.Exists(plateau)) plateau = Path.Combine(Root, "plateau-1845-831.json");
+
+        // Power limit memorise (fichier utilise aussi par le watchdog).
+        int pl = 320;
+        try
         {
-            "Application de la courbe V/F",
-            "Reglage du power limit a 320 W",
-            "Verification de la courbe",
-            "Verification du service de ventilation"
+            string f = Path.Combine(Root, "power-limit.txt");
+            if (File.Exists(f))
+            {
+                var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f), @"(\d+)");
+                if (m.Success) pl = int.Parse(m.Groups[1].Value);
+            }
+        }
+        catch { }
+
+        RunSteps(Lang.French ? "Application de la configuration" : "Applying configuration", new[]
+        {
+            Lang.French ? "Application de la courbe V/F" : "Applying the V/F curve",
+            Lang.French ? "Reglage du power limit a " + pl + " W" : "Setting power limit to " + pl + " W",
+            Lang.French ? "Verification de la courbe" : "Checking the curve",
+            Lang.French ? "Verification du service de ventilation" : "Checking the fan service"
         }, i =>
         {
             switch (i)
             {
                 case 0:
-                    Ps("& '" + Path.Combine(Root, "snu.exe") + "' --in-tuning-file '" +
-                       Path.Combine(Root, "plateau-1845-831.json") + "' --no-persist | Out-Null");
+                    Ps("& '" + Path.Combine(Root, "snu.exe") + "' --in-tuning-file '" + plateau + "' --no-persist | Out-Null");
                     break;
                 case 1:
-                    Ps("& nvidia-smi -pl 320 | Out-Null");
+                    Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + pl + " | Out-Null");
+                    try { File.WriteAllText(Path.Combine(Root, "power-limit.txt"), pl + " W\n"); } catch { }
                     break;
                 case 2:
                     Ps("& '" + Path.Combine(Root, "snu.exe") + "' status | Out-Null");
+                    AppendHistory(0, 0, pl, Lang.Current == "fr" ? "equilibre" : "balanced");
                     break;
                 case 3:
                     Ps("Get-Service NvidiaFanCurve -ErrorAction SilentlyContinue | Out-Null");
@@ -1317,14 +1335,15 @@ internal sealed partial class MainForm : Form
                 }
             }
             MessageBox.Show(
-                "Icone epinglee dans la zone de notification.\n\n" +
-                "Redemarrez la session (ou l'explorateur) pour que le changement soit applique.",
-                "Icone", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Lang.French
+                    ? "Icone epinglee dans la zone de notification.\n\nRedemarrez la session (ou l'explorateur) pour que le changement soit applique."
+                    : "Icon pinned to the notification area.\n\nRestart the session (or Explorer) for the change to apply.",
+                Lang.French ? "Icone" : "Icon", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception e)
         {
-            MessageBox.Show("Impossible d'epingler l'icone : " + e.Message, "Icone",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show((Lang.French ? "Impossible d'epingler l'icone : " : "Unable to pin the icon: ") + e.Message,
+                Lang.French ? "Icone" : "Icon", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 

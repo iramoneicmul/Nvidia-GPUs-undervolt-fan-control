@@ -51,6 +51,19 @@ internal static class Lang
         return i < 0 ? 0 : i;
     }
 
+    /// <summary>Nom de profil de ventilation traduit.</summary>
+    public static string Profile(string profil)
+    {
+        if (French || string.IsNullOrEmpty(profil)) return profil;
+        switch (profil)
+        {
+            case "silence": return "quiet";
+            case "equilibre": return "balanced";
+            case "froid": return "cool";
+            default: return profil;
+        }
+    }
+
     public static string T(string french)
     {
         if (string.IsNullOrEmpty(french)) return french;
