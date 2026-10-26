@@ -875,10 +875,14 @@ internal sealed partial class MainForm : Form
     private void RestoreOriginal()
     {
         if (MessageBox.Show(
-            "Restaurer la configuration d'origine ?\n\n" +
-            "- courbe V/F stock\n- power limit d'origine (" + PlDefault + " W)\n- ventilateurs rendus au VBIOS\n" +
-            "- service et tache planifiee supprimes",
-            "Restauration", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            (Lang.French
+                ? "Restaurer la configuration d'origine ?\n\n" +
+                  "- courbe V/F stock\n- power limit d'origine (" + PlDefault + " W)\n- ventilateurs rendus au VBIOS\n" +
+                  "- service et tache planifiee supprimes"
+                : "Restore the stock configuration?\n\n" +
+                  "- stock V/F curve\n- default power limit (" + PlDefault + " W)\n- fans returned to VBIOS\n" +
+                  "- service and scheduled task removed"),
+            Lang.French ? "Restauration" : "Restore", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
             return;
 
         RunSteps("Restauration de l'origine", new[]
@@ -1297,7 +1301,7 @@ internal sealed partial class MainForm : Form
             {
                 if (baseKey == null)
                 {
-                    MessageBox.Show("Cle de notification introuvable.", "Icone",
+                    MessageBox.Show(Lang.T("Cle de notification introuvable."), "Icone",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -1637,8 +1641,11 @@ internal static class Program
             if (!tune && !hidden)
             {
                 MessageBox.Show(
-                    "Un test d'optimisation a ete interrompu (probable instabilite du pilote).\n\n" +
-                    "La configuration d'origine a ete restauree automatiquement.\n" +
+                    (Lang.French
+                        ? "Un test d'optimisation a ete interrompu (probable instabilite du pilote).\n\n" +
+                          "La configuration d'origine a ete restauree automatiquement.\n"
+                        : "An optimisation test was interrupted (likely driver instability).\n\n" +
+                          "The stock configuration was restored automatically.\n") +
                     "L'optimisation reprendra a un palier plus sur.",
                     "Test interrompu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
@@ -1648,7 +1655,8 @@ internal static class Program
         {
             Log("refus : " + compat.Reason);
             MessageBox.Show(
-                "Cette carte n'est pas compatible avec NVIDIA Configuration.\n\n" +
+                (Lang.French ? "Cette carte n'est pas compatible avec NVIDIA Configuration.\n\n"
+                             : "This card is not supported by NVIDIA Configuration.\n\n") +
                 compat.Summary + "\n\n" +
                 "Le programme ne peut pas s'executer sur ce materiel.",
                 "Materiel incompatible", MessageBoxButtons.OK, MessageBoxIcon.Error);

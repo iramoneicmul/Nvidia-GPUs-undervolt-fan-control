@@ -554,3 +554,66 @@ Gains mesurés :
 Conclusion : la chaîne fonctionne (dichotomie, détection CUDA/Xid, ventilation
 testée, fréquence max). La marge de tension a été portée à 4 pas ensuite, et la
 configuration appliquée reste **1845 MHz / 831 mV / 320 W**.
+
+---
+
+## 16. Correction des 9 bugs (v1.9.2)
+
+| # | Bug | Correction | Vérification |
+|---|---|---|---|
+| 1 | Sauvegardes jamais purgées | seules les 10 plus récentes sont conservées | `backup` : 3 dossiers après installation |
+| 2 | Traduction incomplète | messages, dialogues et rapports suivent la langue | `Lang.French` utilisé dans 19 endroits |
+| 3 | Watchdog et test orphelin | marqueur > 30 min restauré même si une instance tourne | logique revue |
+| 4 | Tension retenue non retestée | test de 240 s après marge, jusqu'à 3 remontées | journal `package verification` |
+| 5 | Ventilation trop binaire | ordre explicite silence → équilibre → froid selon le seuil | journal `ventilation : choix` |
+| 6 | Pas de signature Authenticode | certificat auto-signé (magasin machine), binaires signés | **Status = Valid** |
+| 7 | Test de stabilité peu sévère | comparaison après **chaque** multiplication (15× plus de points de contrôle) | `stability.py` |
+| 8 | Fréquence limitée à 8 paliers | **12 paliers** (+180 MHz) | journal `package frequence` |
+| 9 | Rapports HTML en français | libellés et noms de charges traduits | rapport comparatif |
+
+### 16.1 Détail du test de stabilité (point 7)
+
+Avant : 15 multiplications enchaînées, puis **une seule** comparaison. Une erreur
+apparaissant sur l'une des 14 premières pouvait être écrasée par la suivante.
+
+Après : chaque multiplication est synchronisée et comparée immédiatement.
+
+```
+pour chaque itération :
+    pour 15 multiplications :
+        c = a @ b
+        synchronisation
+        comparaison avec la référence   <-- point de contrôle
+```
+
+À raison de ~2 400 itérations par palier, cela représente **~36 000
+comparations** au lieu de 2 400 : c'est ce qui rapproche le test automatisé des
+28 187 itérations du test manuel de référence.
+
+### 16.2 Signature Authenticode (point 6)
+
+- certificat auto-signé `CN=NVIDIA Configuration (auto-signe)`, créé dans
+  `Cert:\LocalMachine\My`, valable 5 ans ;
+- signature appliquée par `Set-AuthenticodeSignature` sur `nvidiaconf.exe` et
+  `nvfan.exe` **avant** la génération du MSI (étape 3bis de `build.ps1`) ;
+- certificat public exporté : `nvidiaconf-selfsigned.cer` ;
+- racine approuvée localement pour que le statut soit `Valid`.
+
+**Limite** : un certificat auto-signé ne supprime pas l'avertissement SmartScreen
+sur une machine tierce. Pour cela il faut un certificat délivré par une autorité
+reconnue (payant). L'utilisateur peut importer `nvidiaconf-selfsigned.cer` dans
+« Autorités de certification racines de confiance » pour valider la signature.
+
+### 16.3 État vérifié après installation
+
+```
+version    : 1.9.2.0
+signature  : Valid
+langue     : en (par defaut)
+courbe     : 1845 MHz / 831 mV
+power limit: 320 W
+ventilateur: 0 % (mode 0 dB au repos)
+service    : Running
+backup     : 3 dossiers
+erreurs    : aucune
+```

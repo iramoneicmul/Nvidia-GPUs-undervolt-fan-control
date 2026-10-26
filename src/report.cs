@@ -34,7 +34,6 @@ internal sealed partial class MainForm
     {
         if (_busy) return;
         _busy = true;
-        if (_timer != null) _timer.Stop();
         _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
         _bar.Value = 0;
         _step.Text = "Comparaison : preparation (~15 min)";
@@ -51,7 +50,6 @@ internal sealed partial class MainForm
             {
                 Ui(() =>
                 {
-                    if (_timer != null) _timer.Start();
                     _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = true;
                     _busy = false;
                 });
@@ -132,6 +130,9 @@ internal sealed partial class MainForm
         });
     }
 
+    // Choix de libelle selon la langue active.
+    private static string B(string fr, string en) { return Lang.French ? fr : en; }
+
     private string BuildComparisonHtml(Dictionary<string, Measure> stock, Dictionary<string, Measure> opti)
     {
         string[] levels = { "legere", "jeu", "soutenue", "lourde" };
@@ -148,13 +149,13 @@ internal sealed partial class MainForm
         sb.AppendLine(".gain{color:#76b900;font-weight:600}.loss{color:#e06060;font-weight:600}");
         sb.AppendLine(".meta{color:#888;font-size:12px}");
         sb.AppendLine("</style></head><body>");
-        sb.AppendLine("<h1>Comparatif origine / reglages appliques</h1>");
+        sb.AppendLine("<h1>" + B("Comparatif origine / reglages appliques", "Stock / applied comparison") + "</h1>");
         sb.AppendLine("<div class=\"meta\">" + DateTime.Now.ToString("yyyy-MM-dd HH:mm") + " &middot; " +
                       Esc(_s.Name) + " &middot; pilote " + Esc(_s.Driver) + "</div>");
 
-        sb.AppendLine("<h2>Detail par niveau de charge</h2>");
-        sb.AppendLine("<table><tr><th>Charge</th><th>Origine</th><th>Applique</th>" +
-                      "<th>Gain MHz</th><th>Gain W</th><th>Gain C</th></tr>");
+        sb.AppendLine("<h2>" + B("Detail par niveau de charge", "Detail by load level") + "</h2>");
+        sb.AppendLine("<table><tr><th>" + B("Charge", "Load") + "</th><th>" + B("Origine", "Stock") + "</th><th>" + B("Applique", "Applied") + "</th>" +
+                      "<th>" + B("Gain MHz", "Gain MHz") + "</th><th>" + B("Gain W", "Gain W") + "</th><th>" + B("Gain C", "Gain C") + "</th></tr>");
         foreach (string lvl in levels)
         {
             if (!stock.ContainsKey(lvl) || !opti.ContainsKey(lvl)) continue;
@@ -163,7 +164,7 @@ internal sealed partial class MainForm
             int dm = b.Mhz - a.Mhz;
             double dw = b.Watts - a.Watts;
             int dc = b.TempGpu - a.TempGpu;
-            sb.AppendLine("<tr><td>" + Cap(lvl) + "</td><td class=\"num\">" + FmtMeasure(a) +
+            sb.AppendLine("<tr><td>" + LevelName(lvl) + "</td><td class=\"num\">" + FmtMeasure(a) +
                           "</td><td class=\"num\">" + FmtMeasure(b) + "</td>" +
                           "<td class=\"num " + Cls(-dm) + "\">" + Signed(dm) + " MHz</td>" +
                           "<td class=\"num " + Cls(dw < 0 ? -1 : (dw > 0 ? 1 : 0)) + "\">" + Signed(dw, 1) + " W</td>" +
@@ -171,18 +172,31 @@ internal sealed partial class MainForm
         }
         sb.AppendLine("</table>");
 
-        sb.AppendLine("<h2>Configuration appliquee</h2><table>");
-        sb.AppendLine("<tr><th>Parametre</th><th>Valeur</th></tr>");
+        sb.AppendLine("<h2>" + B("Configuration appliquee", "Applied configuration") + "</h2><table>");
+        sb.AppendLine("<tr><th>" + B("Parametre", "Parameter") + "</th><th>" + B("Valeur", "Value") + "</th></tr>");
         sb.AppendLine("<tr><td>Undervolt</td><td>" + Esc(_s.Undervolt) + "</td></tr>");
-        sb.AppendLine("<tr><td>Tension du plateau</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Tension du plateau", "Plateau voltage") + "</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
         sb.AppendLine("<tr><td>Power limit</td><td>" + _s.PowerLimit.ToString("0") + " W</td></tr>");
-        sb.AppendLine("<tr><td>Profil de ventilation</td><td>" + Esc(_s.Profile) + "</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(_s.Profile) + "</td></tr>");
         sb.AppendLine("</table>");
 
-        sb.AppendLine("<p class=\"meta\">Charges PyTorch de 60 s par niveau. " +
-                      "Les gains positifs (vert) sont favorables a la configuration appliquee.</p>");
+        sb.AppendLine("<p class=\"meta\">" + B("Charges PyTorch de 60 s par niveau. Les gains positifs (vert) sont favorables a la configuration appliquee.",
+                      "60 s PyTorch loads per level. Positive gains (green) favour the applied configuration.") + "</p>");
         sb.AppendLine("</body></html>");
         return sb.ToString();
+    }
+
+    private static string LevelName(string lvl)
+    {
+        if (Lang.French) return lvl.Substring(0, 1).ToUpperInvariant() + lvl.Substring(1);
+        switch (lvl)
+        {
+            case "legere": return "Light";
+            case "jeu": return "Gaming";
+            case "soutenue": return "Sustained";
+            case "lourde": return "Heavy";
+            default: return lvl;
+        }
     }
 
     private static string FmtMeasure(Measure m)
@@ -203,7 +217,7 @@ internal sealed partial class MainForm
         }
         catch (Exception e)
         {
-            MessageBox.Show("Impossible d'ouvrir le rapport : " + e.Message, "Rapport",
+            MessageBox.Show(Lang.T("Impossible d'ouvrir le rapport : ") + e.Message, Lang.T("Rapport"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -256,12 +270,12 @@ internal sealed partial class MainForm
         sb.AppendLine("<div class=\"meta\">" + DateTime.Now.ToString("yyyy-MM-dd HH:mm") +
                       " &middot; " + _s.Name + " &middot; pilote " + _s.Driver + "</div>");
 
-        sb.AppendLine("<h2>Configuration appliquee</h2><table>");
-        sb.AppendLine("<tr><th>Parametre</th><th>Valeur</th></tr>");
+        sb.AppendLine("<h2>" + B("Configuration appliquee", "Applied configuration") + "</h2><table>");
+        sb.AppendLine("<tr><th>" + B("Parametre", "Parameter") + "</th><th>" + B("Valeur", "Value") + "</th></tr>");
         sb.AppendLine("<tr><td>Undervolt</td><td>" + Esc(_s.Undervolt) + "</td></tr>");
-        sb.AppendLine("<tr><td>Tension du plateau</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Tension du plateau", "Plateau voltage") + "</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
         sb.AppendLine("<tr><td>Power limit</td><td>" + _s.PowerLimit.ToString("0") + " W</td></tr>");
-        sb.AppendLine("<tr><td>Profil de ventilation</td><td>" + Esc(_s.Profile) + "</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(_s.Profile) + "</td></tr>");
         sb.AppendLine("<tr><td>Moteur de test</td><td>" + Esc(_s.Torch) + " (PyTorch) / OpenCL integre</td></tr>");
         sb.AppendLine("</table>");
 

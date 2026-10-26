@@ -1,4 +1,4 @@
-# NVIDIA Configuration 1.8.2 — NVIDIA GPU tuning suite
+# NVIDIA Configuration 1.9.2 — NVIDIA GPU tuning suite
 
 ## Français
 
@@ -112,8 +112,8 @@ optionnels (installables depuis l'application).
 ### Empreintes SHA-256
 
 ```
-a10c802d4f5883633ada0a13b82bbee8f54dbc5d2fac5920fd864e6eea43b049  nvidiaconf.exe
-e9fda54bdcbf66108f3ff3385e1f933c0a9f77a78a574111e4c82fc5ba61e88d  nvidiaconf.msi
+43dd1672408c09d12647e5097f33ed7ac3fff41bcd23cc0e26775097410dab71  nvidiaconf.exe
+562616788b7ddda49875cf73acacd2feec02c1fa770575c2965b7214dddd64e6  nvidiaconf.msi
 ```
 
 ---
@@ -226,6 +226,6 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 ### SHA-256
 
 ```
-a10c802d4f5883633ada0a13b82bbee8f54dbc5d2fac5920fd864e6eea43b049  nvidiaconf.exe
-e9fda54bdcbf66108f3ff3385e1f933c0a9f77a78a574111e4c82fc5ba61e88d  nvidiaconf.msi
+43dd1672408c09d12647e5097f33ed7ac3fff41bcd23cc0e26775097410dab71  nvidiaconf.exe
+562616788b7ddda49875cf73acacd2feec02c1fa770575c2965b7214dddd64e6  nvidiaconf.msi
 ```

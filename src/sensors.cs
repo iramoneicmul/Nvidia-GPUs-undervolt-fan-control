@@ -57,13 +57,13 @@ internal sealed partial class MainForm
             }
             File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
             LogMsg("export CSV : " + path);
-            MessageBox.Show("Export ecrit :\n" + path, "Export CSV",
+            MessageBox.Show(Lang.T("Export ecrit :") + "\n" + path, Lang.T("Export CSV"),
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception e)
         {
             LogMsg("export CSV : " + e.Message);
-            MessageBox.Show("Export impossible : " + e.Message, "Export CSV",
+            MessageBox.Show(Lang.T("Export impossible : ") + e.Message, Lang.T("Export CSV"),
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -263,14 +263,19 @@ internal sealed partial class MainForm
             Thread.Sleep(5000);
         }
 
+        // Preference explicite du moins bruyant au plus bruyant : la regulation
+        // en boucle fermee egalise les regimes mesures, il faut donc choisir
+        // sur la consigne du profil, pas sur le regime releve.
+        string[] ordre = { "silence", "equilibre", "froid" };
         string choisi = "froid";
-        int bestRpm = int.MaxValue;
-        foreach (var m in mesures)
+        foreach (string nom in ordre)
         {
-            int rpm = int.Parse(m[1]);
+            var m = mesures.Find(x => x[0] == nom);
+            if (m == null) continue;
             int gpu = int.Parse(m[2]);
-            if (gpu <= seuil && rpm > 0 && rpm < bestRpm) { bestRpm = rpm; choisi = m[0]; }
+            if (gpu <= seuil) { choisi = nom; break; }
         }
+        LogMsg("ventilation : seuil " + seuil + " C, choix " + choisi);
 
         try { File.Copy(Path.Combine(Root, "profil-" + choisi + ".txt"), Path.Combine(Root, "fan-curve.txt"), true); } catch { }
         LogMsg("ventilation : seuil " + seuil + " C, profil retenu " + choisi);

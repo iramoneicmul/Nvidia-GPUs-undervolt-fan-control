@@ -206,6 +206,22 @@ internal sealed partial class MainForm
                 File.WriteAllText(Path.Combine(dir, "power-limit.txt"), pl + " W\n");
             }
             catch { }
+            // Ne conserver que les 10 sauvegardes les plus recentes.
+            try
+            {
+                var dirs = Directory.GetDirectories(Path.Combine(Root, "backup"));
+                if (dirs.Length > 10)
+                {
+                    Array.Sort(dirs, StringComparer.OrdinalIgnoreCase);
+                    for (int i = 0; i < dirs.Length - 10; i++)
+                    {
+                        try { Directory.Delete(dirs[i], true); } catch { }
+                    }
+                    LogMsg("sauvegardes : " + (dirs.Length - 10) + " ancienne(s) supprimee(s)");
+                }
+            }
+            catch { }
+
             LogMsg("sauvegarde avant test : " + dir);
         }
         catch (Exception e) { LogMsg("sauvegarde avant test : " + e.Message); }
@@ -372,9 +388,12 @@ internal sealed partial class MainForm
             LogMsg("package : PyTorch requis et introuvable");
             Ui(() => { _step.Text = "PyTorch est requis. Utilisez « Installer PyTorch »."; });
             MessageBox.Show(
-                "La recherche de tension exige PyTorch (plus fiable qu'OpenCL).\n\n" +
-                "Installez-le avec le bouton « Installer PyTorch », puis relancez.",
-                "PyTorch requis", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Lang.French
+                    ? "La recherche de tension exige PyTorch (plus fiable qu'OpenCL).\n\n" +
+                      "Installez-le avec le bouton « Installer PyTorch », puis relancez."
+                    : "Voltage search requires PyTorch (more reliable than OpenCL).\n\n" +
+                      "Install it with the \"Install PyTorch\" button, then try again.",
+                Lang.T("PyTorch requis"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         var stock = new Dictionary<string, Measure>();
@@ -428,10 +447,12 @@ internal sealed partial class MainForm
             Ui(() => { _step.Text = "Moteur de test indisponible (PyTorch / stability.py)."; });
             if (Environment.UserInteractive)
             MessageBox.Show(
-                "Le moteur de test est incomplet :\n" +
-                "  PyTorch : " + (pyPath == null ? "absent" : "present") + "\n" +
-                "  stability.py : " + (File.Exists(stab) ? "present" : "absent") + "\n\n" +
-                "Utilisez « Installer PyTorch » puis relancez.",
+                (Lang.French
+                    ? "Le moteur de test est incomplet :\n"
+                    : "The test engine is incomplete:\n") +
+                (Lang.French ? "  PyTorch : " : "  PyTorch: ") + (pyPath == null ? (Lang.French ? "absent" : "missing") : (Lang.French ? "present" : "present")) + "\n" +
+                "  stability.py : " + (File.Exists(stab) ? (Lang.French ? "present" : "present") : (Lang.French ? "absent" : "missing")) + "\n\n" +
+                (Lang.French ? "Utilisez « Installer PyTorch » puis relancez." : "Use \"Install PyTorch\" then try again."),
                 "Moteur de test", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -461,7 +482,7 @@ internal sealed partial class MainForm
             int ecarts = ParseEcarts(res);
             LogMsg(string.Format("package tension imposee {0} mV -> {1}", mv, res.Replace("\n", " ")));
             rows.Add(string.Format("| {0} | {1} | {2} |", mv,
-                res.Replace("|", "/"), ecarts == 0 ? "stable" : "**echec**"));
+                res.Replace("|", "/"), ecarts == 0 ? "stable" : (Lang.French ? "**echec**" : "**fail**")));
 
             if (ecarts != 0)
             {
@@ -471,8 +492,10 @@ internal sealed partial class MainForm
                 LogMsg("package : tension imposee instable, valeur sure proposee " + prop);
                 Ui(() => { _step.Text = "Tension imposee instable - arret."; });
                 if (Environment.UserInteractive)
-                    MessageBox.Show("La tension de " + mv + " mV est instable.\n\nValeur sure proposee : " + prop + ".",
-                        "Tension instable", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show((Lang.French
+                            ? "La tension de " + mv + " mV est instable.\n\nValeur sure proposee : " + prop + "."
+                            : "The " + mv + " mV voltage is unstable.\n\nSuggested safe value: " + prop + "."),
+                        Lang.T("Tension instable"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 ClearMarker();
                 return;
             }
@@ -534,8 +557,10 @@ internal sealed partial class MainForm
                 UiProgress("Aucune tension stable - arret", 75, 0);
                 ClearMarker();
                 if (Environment.UserInteractive)
-                    MessageBox.Show("Aucune tension de la plage testee n'est stable.\nLa configuration d'origine est conservee.",
-                        "Tension", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(Lang.French
+                            ? "Aucune tension de la plage testee n'est stable.\nLa configuration d'origine est conservee."
+                            : "No voltage in the tested range is stable.\nThe stock configuration is kept.",
+                        Lang.T("Tension"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -563,6 +588,31 @@ internal sealed partial class MainForm
 
             LogMsg(string.Format("package : dernier palier stable {0} mV -> retenu {1} mV", lastOk, mvRetained));
         }
+        // Verification de la tension finale, marge incluse : la marge ajoute
+        // des pas qui n'ont pas ete testes par la recherche.
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            UiProgress(string.Format("Verification de la tension retenue {0} mV", mvRetained), 76, 5);
+            TargetMhz = target;
+            WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
+            ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
+
+            var tCheck = DateTime.Now;
+            string rCheck = RunPythonStability(240);
+            bool okCheck = ParseEcarts(rCheck) == 0 && ParseErreurs(rCheck) == 0 && CountXid(tCheck) == 0;
+            LogMsg(string.Format("package verification {0} mV -> {1} (ok={2})",
+                mvRetained, rCheck.Replace("\n", " "), okCheck));
+
+            if (okCheck) break;
+
+            var ascCheck = new List<int>(cands);
+            ascCheck.Sort();
+            int idxCheck = ascCheck.IndexOf(mvRetained);
+            if (idxCheck < 0 || idxCheck + 1 >= ascCheck.Count) break;
+            mvRetained = ascCheck[idxCheck + 1];
+            LogMsg("package : tension retenue instable, passage a " + mvRetained + " mV");
+        }
+
         ClearMarker();
         LogMsg("package : tension retenue " + mvRetained + " mV");
 
@@ -605,7 +655,7 @@ internal sealed partial class MainForm
             if (okBase)
             {
                 best = baseMhz;
-                for (int step = 1; step <= 8; step++)
+                for (int step = 1; step <= 12; step++)
                 {
                     int mhz = best + 15;
                     if (mhz > maxMhz) break;
@@ -848,22 +898,22 @@ internal sealed partial class MainForm
                                     int target, int mv, int pl, List<string> rows, int firstFail)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("# Package optimal - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+        sb.AppendLine((Lang.French ? "# Package optimal - " : "# Optimal package - ") + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
         sb.AppendLine();
-        sb.AppendLine("Carte : " + _s.Name);
+        sb.AppendLine((Lang.French ? "Carte : " : "Card: ") + _s.Name);
         sb.AppendLine();
-        sb.AppendLine("## Package retenu");
+        sb.AppendLine(Lang.French ? "## Package retenu" : "## Selected package");
         sb.AppendLine();
-        sb.AppendLine("| Parametre | Valeur |");
+        sb.AppendLine(Lang.French ? "| Parametre | Valeur |" : "| Parameter | Value |");
         sb.AppendLine("|---|---|");
-        sb.AppendLine("| Frequence cible | **" + target + " MHz** |");
-        sb.AppendLine("| Tension | **" + mv + " mV** |");
+        sb.AppendLine((Lang.French ? "| Frequence cible | **" : "| Target frequency | **") + target + " MHz** |");
+        sb.AppendLine((Lang.French ? "| Tension | **" : "| Voltage | **") + mv + " mV** |");
         sb.AppendLine("| Power limit | **" + pl + " W** |");
-        sb.AppendLine("| Ventilation | **" + _fanProfileChosen + "** |");
+        sb.AppendLine((Lang.French ? "| Ventilation | **" : "| Cooling | **") + _fanProfileChosen + "** |");
         sb.AppendLine();
-        sb.AppendLine("## Comparatif par niveau de charge");
+        sb.AppendLine(Lang.French ? "## Comparatif par niveau de charge" : "## Comparison by load level");
         sb.AppendLine();
-        sb.AppendLine("| Charge | Origine | Package | Gain MHz | Gain W | Gain C |");
+        sb.AppendLine(Lang.French ? "| Charge | Origine | Package | Gain MHz | Gain W | Gain C |" : "| Load | Stock | Package | Gain MHz | Gain W | Gain C |");
         sb.AppendLine("|---|---|---|---|---|---|");
 
         foreach (string lvl in LevelNames)
@@ -877,7 +927,7 @@ internal sealed partial class MainForm
         }
 
         sb.AppendLine();
-        sb.AppendLine("## Paliers de tension testes");
+        sb.AppendLine(Lang.French ? "## Paliers de tension testes" : "## Voltage tiers tested");
         sb.AppendLine();
         sb.AppendLine("| Tension | Resultat | Verdict |");
         sb.AppendLine("|---|---|---|");

@@ -85,6 +85,19 @@ Technical log lines stay in French.
 
 ---
 
+## Signed binaries
+
+`nvidiaconf.exe` and `nvfan.exe` are signed with a **self-signed Authenticode
+certificate** (`nvidiaconf-selfsigned.cer`). To verify the signature locally,
+import that certificate into "Trusted Root Certification Authorities"; the
+signature status then becomes **Valid**.
+
+A self-signed certificate does **not** remove the SmartScreen warning on a
+third-party machine — that requires a certificate issued by a recognised
+authority. SHA256 checksums and an optional GPG signature are still published.
+
+---
+
 ## Compatibility
 
 The application does **not** rely on a model list — it checks capabilities at

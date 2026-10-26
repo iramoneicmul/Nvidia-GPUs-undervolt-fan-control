@@ -88,6 +88,19 @@ sont traduits. Les lignes techniques du journal restent en français.
 
 ---
 
+## Binaires signés
+
+`nvidiaconf.exe` et `nvfan.exe` sont signés avec un **certificat Authenticode
+auto-signé** (`nvidiaconf-selfsigned.cer`). Pour vérifier la signature
+localement, importez ce certificat dans « Autorités de certification racines de
+confiance » ; le statut devient alors **Valid**.
+
+Un certificat auto-signé ne supprime **pas** l'avertissement SmartScreen sur une
+machine tierce : cela exige un certificat délivré par une autorité reconnue. Les
+empreintes SHA256 et une signature GPG facultative restent publiées.
+
+---
+
 ## Compatibilité
 
 L'application ne se base **pas** sur une liste de modèles : elle vérifie les

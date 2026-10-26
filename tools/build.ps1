@@ -51,10 +51,43 @@ Push-Location $stage
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "echec compilation nvfan.exe" }
 & $csc /nologo /target:winexe /platform:x64 /out:nvidiaconf.exe /win32icon:icon.ico `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.ServiceProcess.dll `
-    nvidiaconf.cs autotune.cs compat.cs freq.cs sensors.cs OpenClTest.cs report.cs package.cs VersionInfo.cs
+    nvidiaconf.cs autotune.cs compat.cs freq.cs sensors.cs lang.cs OpenClTest.cs report.cs package.cs VersionInfo.cs
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "echec compilation nvidiaconf.exe" }
 Pop-Location
 '  binaires recompiles'
+
+Write-Host "=== 3bis) signature Authenticode ==="
+$cert = $null
+try {
+    $cert = Get-ChildItem Cert:\LocalMachine\My -CodeSigningCert -ErrorAction SilentlyContinue |
+        Where-Object { $_.Subject -like '*NVIDIA Configuration*' } | Select-Object -First 1
+    if (-not $cert) {
+        $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue |
+            Where-Object { $_.Subject -like '*NVIDIA Configuration*' } | Select-Object -First 1
+    }
+    if (-not $cert) {
+        try {
+            $cert = New-SelfSignedCertificate -Type CodeSigningCert `
+                -Subject 'CN=NVIDIA Configuration (auto-signe)' `
+                -CertStoreLocation Cert:\LocalMachine\My -NotAfter (Get-Date).AddYears(5)
+        }
+        catch {
+            $cert = New-SelfSignedCertificate -Type CodeSigningCert `
+                -Subject 'CN=NVIDIA Configuration (auto-signe)' `
+                -CertStoreLocation Cert:\CurrentUser\My -NotAfter (Get-Date).AddYears(5)
+        }
+        '  certificat auto-signe cree'
+    }
+    Export-Certificate -Cert $cert -FilePath (Join-Path $work 'nvidiaconf-selfsigned.cer') -Force | Out-Null
+    foreach ($f in @('nvidiaconf.exe', 'nvfan.exe')) {
+        $p = Join-Path $stage $f
+        if (Test-Path $p) {
+            $sig = Set-AuthenticodeSignature -FilePath $p -Certificate $cert
+            '  ' + $f + ' : ' + $sig.Status
+        }
+    }
+}
+catch { '  signature ignoree : ' + $_.Exception.Message }
 
 Write-Host "=== 4) generation du fichier WiX ==="
 & $python $gen -Src $stage -Out (Join-Path $work 'nvidiaconf.wxs') -Version $Version
