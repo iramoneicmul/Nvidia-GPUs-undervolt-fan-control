@@ -249,6 +249,7 @@ internal sealed class Snapshot
     public string PcieGen = "-", PcieWidth = "-";
     public string VoltMin = "-", VoltMax = "-", VoltPlateau = "-";
     public string Torch = "non detecte";
+    public string AppVersion = "-";
 }
 
 internal sealed partial class MainForm : Form
@@ -334,6 +335,7 @@ internal sealed partial class MainForm : Form
         _timer.Tick += (o, e) => Refresh(false);
         _timer.Start();
 
+        try { _s.AppVersion = Application.ProductVersion; } catch { }
         Refresh(true);
         if (_autoTuneRequested) AutoTune();
         if (_startHidden)
@@ -485,7 +487,7 @@ internal sealed partial class MainForm : Form
         int y1 = 8;
         y1 = Section(tIdent, "Identite", y1, new[]
         {
-            "Nom", "Revision", "VBIOS", "Pilote", "Bus PCI", "Memoire video", "PyTorch"
+            "Version de nvidiaconf", "Nom", "Revision", "VBIOS", "Pilote", "Bus PCI", "Memoire video", "PyTorch"
         });
         Section(tIdent, "Bus PCI Express", y1, new[]
         {
@@ -957,6 +959,7 @@ internal sealed partial class MainForm : Form
     {
         _lStatus.Text = _s.Name + "  |  " + _s.Driver;
 
+        Set("Version de nvidiaconf", _s.AppVersion);
         Set("Nom", _s.Name);
         bool revOk = !string.IsNullOrEmpty(_s.DeviceId) && _s.DeviceId != "00000000";
         Set("Revision", revOk ? (_s.DeviceId + " / " + _s.SubId) : "n/a");

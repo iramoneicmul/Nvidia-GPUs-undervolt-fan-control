@@ -181,3 +181,26 @@ Mettre à jour les empreintes SHA-256 dans `README.md` et `README.fr.md`.
 | Bruit non mesurable | le programme raisonne en tr/min |
 | `nvidiaconf.log` et `fan-curve.log` | journaux recréés à chaque exécution |
 | Sauvegarde des réglages | `C:\Nvidia\backup`, créée uniquement lors d'une désinstallation avec conservation |
+
+---
+
+## 9. Version affichée dans l'interface
+
+La version affichée dans le premier onglet (Identité) provient de
+`Application.ProductVersion`, donc de l'attribut d'assembly généré par
+`build.ps1` :
+
+```powershell
+$verFile = Join-Path $stage 'VersionInfo.cs'
+[assembly: AssemblyVersion("<Version>.0")]
+[assembly: AssemblyFileVersion("<Version>.0")]
+```
+
+Conséquence : **la version de l'exécutable est toujours identique à celle du
+MSI**, sans risque d'oubli. Il suffit de passer `-Version` au script de build.
+
+Vérification rapide :
+
+```powershell
+(Get-Item C:\Nvidia\nvidiaconf.exe).VersionInfo.FileVersion
+```
