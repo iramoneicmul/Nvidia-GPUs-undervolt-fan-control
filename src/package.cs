@@ -54,6 +54,11 @@ internal sealed partial class MainForm
         catch (Exception e) { LogMsg("CliPackage " + e); }
     }
 
+    public void StartPackageOnShown()
+    {
+        Shown += (o, e) => PackageButton();
+    }
+
     private void PackageButton()
     {
         if (_busy) return;
@@ -87,6 +92,16 @@ internal sealed partial class MainForm
     {
         ReadAutoTuneConfig();
         string py = ResolvePython();
+        if (py == null)
+        {
+            LogMsg("package : PyTorch requis et introuvable");
+            Ui(() => { _step.Text = "PyTorch est requis. Utilisez « Installer PyTorch »."; });
+            MessageBox.Show(
+                "La recherche de tension exige PyTorch (plus fiable qu'OpenCL).\n\n" +
+                "Installez-le avec le bouton « Installer PyTorch », puis relancez.",
+                "PyTorch requis", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
         var stock = new Dictionary<string, Measure>();
         var opti = new Dictionary<string, Measure>();
 
@@ -121,6 +136,23 @@ internal sealed partial class MainForm
         LogMsg("package : frequence cible " + target + " MHz");
 
         // ---------- 3) tension minimale stable ----------
+        // verification du moteur de test avant toute chose
+        string pyPath = ResolvePython();
+        string stab = Path.Combine(Root, "stability.py");
+        if (pyPath == null || !File.Exists(stab))
+        {
+            LogMsg("package : moteur de test incomplet (python=" + (pyPath ?? "absent") +
+                   ", stability.py=" + File.Exists(stab) + ")");
+            Ui(() => { _step.Text = "Moteur de test indisponible (PyTorch / stability.py)."; });
+            MessageBox.Show(
+                "Le moteur de test est incomplet :\n" +
+                "  PyTorch : " + (pyPath == null ? "absent" : "present") + "\n" +
+                "  stability.py : " + (File.Exists(stab) ? "present" : "absent") + "\n\n" +
+                "Utilisez « Installer PyTorch » puis relancez.",
+                "Moteur de test", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         var curve = ReadStockCurve();
         var cands = new List<int>();
         foreach (var kv in curve) if (kv.Key >= 806 && kv.Key <= 843) cands.Add(kv.Key);
@@ -133,7 +165,7 @@ internal sealed partial class MainForm
         {
             int mv = cands[i];
             int idx = i;
-            Ui(() => { _step.Text = string.Format("Tension {0} mV ({1}/{2}) - 4 min", mv, idx + 1, cands.Count); _bar.Value = 22 + (int)(55.0 * idx / cands.Count); });
+            Ui(() => { _step.Text = string.Format("Tension {0} mV ({1}/{2}) - {3} min", mv, idx + 1, cands.Count, Math.Max(1, StabilitySeconds / 60)); _bar.Value = 22 + (int)(55.0 * idx / cands.Count); });
 
             WriteMarker(mv);
             WritePlateau(mv, curve);
@@ -145,8 +177,17 @@ internal sealed partial class MainForm
                 : (OpenClTest.Available ? OpenClTest.Run(StabilitySeconds, 2048, null) : "aucun moteur");
 
             int ecarts = ParseEcarts(res);
+            LogMsg(string.Format("package tension {0} mV -> {1}", mv, res.Replace("\n", " ")));
             rows.Add(string.Format("| {0} | {1} | {2} |", mv,
                 res.Replace("|", "/"), ecarts == 0 ? "stable" : "**echec**"));
+
+            if (res.Contains("aucun moteur") || res.Contains("aucun resultat"))
+            {
+                LogMsg("package : moteur muet, arret de la recherche");
+                Ui(() => { _step.Text = "Moteur de test muet - recherche interrompue."; });
+                ClearMarker();
+                return;
+            }
 
             if (ecarts == 0) lastOk = mv;
             else { firstFail = mv; break; }
