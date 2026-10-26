@@ -806,8 +806,12 @@ internal sealed class FanCurveService : ServiceBase
             string marker = Path.Combine(root, "autotune-inprogress.json");
             if (!File.Exists(marker)) return;
 
+            // Si nvidiaconf tourne encore, le test est en cours : ne pas toucher
+            // a la configuration (un palier dure 10 min, bien plus que le seuil).
+            if (Process.GetProcessesByName("nvidiaconf").Length > 0) return;
+
             var age = DateTime.Now - File.GetLastWriteTime(marker);
-            if (age.TotalMinutes < 4) return;   // test probablement encore en cours
+            if (age.TotalMinutes < 4) return;   // demarrage recent, test peut-etre en cours
 
             Log(root, "test interrompu detecte (" + (int)age.TotalMinutes + " min) : restauration de la configuration active");
 

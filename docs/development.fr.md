@@ -462,152 +462,95 @@ d'une consigne hors limites. Dernier passage : **19 OK, 0 échec**.
 
 Produit `SHA256SUMS` et, si une clé GPG existe, `SHA256SUMS.asc`.
 
+
 ---
 
-## 14. Onglet GPU-Unlock (v1.4.0 / 1.4.1)
+## 14. GPU-Unlock : fonctionnalite abandonnee (v1.4.x -> 1.5.2, retiree en 1.6.0)
 
-### 14.1 Ce qu'est gpu-unlock
+**Decision (26/10/2026) : abandon.** L'onglet a ete retire de l'application.
 
-[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) est un **module
-noyau Linux** chargé dans l'initramfs, **avant** que le pilote `nvidia` ne
-prenne la carte. Il écrit les sélecteurs de vitesse (SS0 `0x88888888`, SS1
-`0x8`) et effectue un FLR. Effet : **doublement du débit d'émission FP/BF16**
-sur GA102, GA103, GA104 et GA106.
+Raisons :
 
-Gains publiés (3090 Ti, 450 W) :
+1. **Le projet de reference est un module noyau Linux.** `Zagitta/gpu-unlock`
+   se charge dans l'initramfs, avant le pilote NVIDIA : aucune API exploitable
+   depuis Windows.
+2. **Le port Windows est un chargeur UEFI experimental** exigeant Secure Boot
+   desactive, BitLocker desactive, une partition EFI dediee, un build local
+   (clang/lld 20.1.8, 5 firmwares) et un profil materiel precis.
+3. **Aucun profil valide pour la RTX 3080 Ti** (seuls 3060, 3070 Ti, 3090 FE,
+   3090 Ti).
+4. **Benefice limite au FP16/BF16** : aucun gain en jeu (FP32), et le power
+   limit reste le facteur limitant.
 
-| Entrée | Avant | Après |
+Codes et fichiers retires en v1.6.0 : `unlock.cs`, `unlock-bench.py`,
+`gpu-unlock.txt`, `unlock-bench.txt`, onglet « GPU-Unlock », options
+`--unlock-status` / `--unlock-bench`. Les releves de debit FP de la carte
+restent consultables dans l'historique des discussions.
+
+---
+
+## 15. Langues, corrections et validation complète (v1.8.x)
+
+### 15.1 Sélection de la langue
+
+- **Langue par défaut : anglais.**
+- Bouton **« Langue »** dans la barre d'actions, menu à six entrées :
+  English, Français, Deutsch, Español, Italiano, Português.
+- Choix conservé dans `C:\Nvidia\language.txt` (`en`, `fr`, `de`, `es`, `it`, `pt`).
+- Application immédiate : l'application se relance d'elle-même (délai de 2 s
+  pour libérer le mutex mono-instance).
+
+Mécanisme : `lang.cs` contient un dictionnaire par langue, la clé étant le texte
+français du code. Repli automatique sur l'anglais puis sur le français si une
+entrée manque. `Lang.Load()` est appelé au démarrage et la langue active est
+journalisée (`demarrage args=... langue=en`).
+
+### 15.2 Corrections de cette série
+
+| Correctif | Cause | Solution |
 |---|---|---|
-| FP16 | 87,46 TFLOPS | 118,39 TFLOPS |
-| BF16 | 87,50 TFLOPS | 157,41 TFLOPS |
-| TF32 | 42,58 TFLOPS | 82,61 TFLOPS |
+| Ventilateurs « n/a » | `ReadFans` écrasait le pourcentage par -1 quand NVAPI échouait | pourcentage lu via `nvidia-smi` (`fan.speed`), RPM NVAPI conservés s'ils existent |
+| Interface figée pendant un test | `_timer.Stop()` dans le package | timer maintenu, appels NVAPI sérialisés par le verrou de `NvSensors` |
+| Watchdog trop agressif | marqueur non rafraîchi pendant un palier de 10 min | ne restaure plus si le processus `nvidiaconf` tourne |
+| Recherche de fréquence bloquée | départ sur la fréquence de la **courbe stock** (1575 MHz) | départ sur la fréquence mesurée à l'origine, puis ±15 MHz |
+| Tension trop basse | marge d'un seul pas (6,25 mV) | marge de **4 pas (25 mV)** |
 
-### 14.2 Pourquoi l'activation Windows est impossible
+### 15.3 Validation complète (26-27/10/2026, 1 h 09)
 
-| Point | Constat |
+Première exécution intégrale de la chaîne : ligne de base → ventilation →
+dichotomie → fréquence → power limit 10 min → mesures.
+
+```
+22:57  package origine lourde : 1641 MHz | 853 mV | 349.1 W | 80 C | 94 C
+23:01  ventilation : profil retenu froid
+23:11  tension 843 mV -> stable (xid=0)
+23:21  tension 818 mV -> stable (xid=0)
+23:31  tension 806 mV -> stable (xid=0)
+23:31  plancher de securite 806 mV (origine 915 mV) -> retenu 812 mV
+23:35  frequence 1755 MHz -> stable
+23:39  frequence 1770 MHz -> stable
+23:43  frequence 1785 MHz -> stable
+00:03  rapport package
+```
+
+Résultat du wizard :
+
+| Paramètre | Valeur |
 |---|---|
-| Type de composant | module noyau Linux, pas un service ni un pilote Windows |
-| Moment d'action | initramfs, avant le binding du pilote NVIDIA |
-| API disponible | aucune : rien à appeler depuis une application Windows |
-| Port Windows | `impacifist/Windows-GPU-UNLOCK`, **chargeur UEFI expérimental** |
-| Prérequis du port | Secure Boot désactivé, BitLocker désactivé, ESP dédiée ≥ 1 Gio, build local (clang/lld 20.1.8, 5 firmwares) |
-| Profils validés | RTX 3060 12 Go, 3070 Ti, 3090 FE, 3090 Ti |
-| RTX 3080 Ti | **aucun profil validé** |
+| Fréquence | 1815 MHz |
+| Tension | 812 mV (marge corrigée après coup) |
+| Power limit | 330 W |
+| Ventilation | froid |
 
-Le bouton « Activer gpu-unlock » **n'active donc rien** : il explique la
-situation, liste les profils existants et renvoie vers les projets. Il a été
-conçu ainsi volontairement : un bouton qui prétendrait activer un module
-absent serait trompeur.
+Gains mesurés :
 
-### 14.3 Ce que fait réellement l'onglet
+| Charge | Origine | Package | Gain |
+|---|---|---|---|
+| Légère | 1933 MHz / 281 W | 1830 MHz / 199 W | −103 MHz, −82 W |
+| Jeu | 1754 MHz / 349 W | 1830 MHz / 315 W | **+76 MHz, −33 W** |
+| Soutenue | 1806 MHz / 349 W | 1830 MHz / 284 W | **+24 MHz, −64 W** |
+| Lourde | 1641 MHz / 349 W | 1675 MHz / 329 W | **+34 MHz, −20 W** |
 
-1. **État de compatibilité** : carte, architecture, nature du moteur, profils
-   Windows validés, statut de la carte installée.
-2. **Boutons** : Activer (explication), Désactiver (explication), Mesurer les
-   performances, Ouvrir le projet, Port Windows.
-3. **Benchmark réel** (`unlock-bench.py`) : quatre multiplications matricielles
-   8192³ de 5 s (FP16, BF16, TF32, FP32) et calcul des TFLOPS.
-4. **Chiffrage du gain** : débit actuel, potentiel déverrouillé (+100 %), gain
-   public observé (×1,88 à ×1,95) et rappel du power limit.
-
-### 14.4 Résultats mesurés sur Hellfire (RTX 3080 Ti, 320 W)
-
-| Précision | Débit mesuré | Potentiel déverrouillé |
-|---|---|---|
-| FP16 | 71,7 TFLOPS | ~143 TFLOPS |
-| BF16 | 73,2 TFLOPS | ~146 TFLOPS |
-| TF32 | 36,6 TFLOPS | ~73 TFLOPS |
-| FP32 | 22,6 TFLOPS | non concerné |
-
-Deux réserves importantes :
-
-1. **Le power limit reste le facteur limitant** : à 320 W, la carte sature
-   énergétiquement avant de saturer l'issue rate. Le gain réel serait donc
-   inférieur à +100 % sans augmenter le PL.
-2. **Aucun gain en jeu** : les jeux utilisent FP32, que le déblocage ne touche
-   pas. Le bénéfice concerne l'IA et le calcul FP16/BF16.
-
-### 14.5 Fichiers
-
-| Fichier | Rôle |
-|---|---|
-| `unlock-bench.py` | benchmark FP16/BF16/TF32/FP32 (embarqué dans le MSI) |
-| `unlock-bench.txt` | dernier résultat (`RESULTAT taille=... FP16=...`) |
-
-Commande directe équivalente :
-
-```powershell
-python C:\Nvidia\unlock-bench.py 8192 C:\Nvidia\unlock-bench.txt
-```
-
-### 14.6 Activation réelle (v1.5.0 → 1.5.2)
-
-L'onglet ne se contente plus d'expliquer : il **pilote le chargeur UEFI** du
-port Windows lorsque celui-ci est présent.
-
-| Action | Commande exécutée |
-|---|---|
-| Activer | `powershell -File <port>\internal-boot\Headless.ps1 -EnableAutomatic -ConfirmedSuccess` |
-| Désactiver | `powershell -File <port>\internal-boot\Headless.ps1 -RestoreWindowsFirst` |
-| Vérifier | `Confirm-SecureBootUEFI`, `Get-BitLockerVolume C:`, `bcdedit /enum firmware` |
-| Choisir le port | `FolderBrowserDialog`, chemin mémorisé dans `gpu-unlock.txt` |
-
-**Garde-fous** : confirmation explicite avant toute modification de
-l'amorçage, refus si Secure Boot est actif, refus si `Headless.ps1` est absent,
-message indiquant les profils validés et le statut de la carte installée.
-
-**Cycle d'état** :
-
-```
-desactive --(Activer)--> ACTIVE (attente redemarrage) --(reboot + Mesurer)--> verdict
-```
-
-Le verdict compare le débit mesuré à la **référence verrouillée** :
-
-| Gain FP16 | Verdict affiché |
-|---|---|
-| > 50 % | « déblocage détecté » |
-| 10 – 50 % | « gain partiel, à confirmer » |
-| < 10 % | « pas de déblocage détecté » |
-
-### 14.7 Fichier d'état
-
-`C:\Nvidia\gpu-unlock.txt` :
-
-```
-enabled=0
-pending=0
-port=C:\Nvidia\gpu-unlock
-last=
-ref_fp16=71.51
-ref_bf16=73.11
-ref_tf32=36.65
-last_fp16=0.00
-last_bf16=0.00
-last_tf32=0.00
-```
-
-### 14.8 Ligne de commande
-
-```powershell
-C:\Nvidia\nvidiaconf.exe --unlock-status
-C:\Nvidia\nvidiaconf.exe --unlock-bench --reference
-C:\Nvidia\nvidiaconf.exe --unlock-bench
-```
-
-`--unlock-status` journalise les cinq contrôles de prérequis ; `--unlock-bench`
-mesure et enregistre soit la référence, soit la mesure courante.
-
-### 14.9 État constaté sur Hellfire (26/10/2026)
-
-```
-[OK]   Secure Boot         : desactive
-[OK]   BitLocker C:        : Off
-[----] Port Windows        : absent (C:\Nvidia\gpu-unlock)
-[OK]   Entree de demarrage : absente
-[OK]   Architecture        : GA102/GA104
-prerequis : manquants
-```
-
-L'activation reste donc bloquée à l'étape « chargeur absent », ce qui est le
-comportement attendu tant que le port UEFI n'est pas compilé et déposé.
+Conclusion : la chaîne fonctionne (dichotomie, détection CUDA/Xid, ventilation
+testée, fréquence max). La marge de tension a été portée à 4 pas ensuite, et la
+configuration appliquée reste **1845 MHz / 831 mV / 320 W**.

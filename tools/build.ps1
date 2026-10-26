@@ -51,7 +51,7 @@ Push-Location $stage
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "echec compilation nvfan.exe" }
 & $csc /nologo /target:winexe /platform:x64 /out:nvidiaconf.exe /win32icon:icon.ico `
     /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.ServiceProcess.dll `
-    nvidiaconf.cs autotune.cs compat.cs freq.cs sensors.cs unlock.cs OpenClTest.cs report.cs package.cs VersionInfo.cs
+    nvidiaconf.cs autotune.cs compat.cs freq.cs sensors.cs OpenClTest.cs report.cs package.cs VersionInfo.cs
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "echec compilation nvidiaconf.exe" }
 Pop-Location
 '  binaires recompiles'

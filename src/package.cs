@@ -264,10 +264,13 @@ internal sealed partial class MainForm
         if (_boundsLabel == null) return;
         int mhzMin, mhzMax, mvMin, mvMax, plMin, plMax;
         ComputeTargetBounds(out mhzMin, out mhzMax, out mvMin, out mvMax, out plMin, out plMax);
-        _boundsLabel.Text = string.Format(
-            "Limites carte : {0}-{1} MHz | {2}-{3} mV | {4}-{5} W\n" +
-            "Toute valeur hors de ces plages est refusee.",
-            mhzMin, mhzMax, mvMin, mvMax, plMin, plMax);
+        _boundsLabel.Text = Lang.French
+            ? string.Format("Limites carte : {0}-{1} MHz | {2}-{3} mV | {4}-{5} W\n" +
+                            "Toute valeur hors de ces plages est refusee.",
+                            mhzMin, mhzMax, mvMin, mvMax, plMin, plMax)
+            : string.Format("Card limits: {0}-{1} MHz | {2}-{3} mV | {4}-{5} W\n" +
+                            "Any value outside these ranges is refused.",
+                            mhzMin, mhzMax, mvMin, mvMax, plMin, plMax);
     }
 
     public void StartPackageOnShown()
@@ -336,9 +339,8 @@ internal sealed partial class MainForm
         LogMsg(string.Format("package : consignes utilisateur {0} MHz / {1} mV / {2} W (0 = auto)",
             requested, requestedMv, requestedPl));
         _busy = true;
-        // suspendre le rafraichissement de l'interface : ses appels NVAPI
-        // concurrents provoquaient un interblocage avec ceux de la mesure.
-        if (_timer != null) _timer.Stop();
+        // L'interface continue de se rafraichir : les appels NVAPI sont
+        // desormais serialises par le verrou interne de NvSensors.
         _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
         _bar.Value = 0;
         _step.Text = "Preparation du package optimal...";
@@ -351,7 +353,6 @@ internal sealed partial class MainForm
             {
                 Ui(() =>
                 {
-                    if (_timer != null) _timer.Start();
                     _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = true;
                     _busy = false;
                 });
@@ -538,16 +539,21 @@ internal sealed partial class MainForm
                 return;
             }
 
-            // Marge : un pas au-dessus du dernier palier stable.
+            // Marge : quatre pas (25 mV) au-dessus du dernier palier stable.
+            // Justification : le test manuel de reference (28 187 iterations sur
+            // 15 min) n'avait revele que 2 ecarts a 818 mV ; un test automatise
+            // de 10 min ne peut pas les voir. Quatre pas ramenent 806 mV a
+            // 831 mV, valeur validee manuellement.
             int idxOk = asc.IndexOf(lastOk);
-            mvRetained = (idxOk + 1 < asc.Count) ? asc[idxOk + 1] : lastOk;
+            int idxMargin = Math.Min(asc.Count - 1, idxOk + 4);
+            mvRetained = asc[idxMargin];
 
             // Garde-fou : ne jamais descendre de plus de 12 % sous la tension
             // d'origine sous charge (limite constatee sur ce type de GPU).
             int origineMv = stock.ContainsKey("jeu") ? stock["jeu"].Mv : 0;
             if (origineMv > 0)
             {
-                int floorMv = (int)Math.Ceiling(origineMv * 0.88);
+                int floorMv = (int)Math.Ceiling(origineMv * 0.90);
                 int rounded = asc[asc.Count - 1];
                 foreach (int c in asc) if (c >= floorMv) { rounded = c; break; }
                 if (mvRetained < rounded) mvRetained = rounded;
@@ -568,45 +574,55 @@ internal sealed partial class MainForm
         }
         else
         {
-            int baseMhz = curve.ContainsKey(mvRetained) ? curve[mvRetained] : TargetMhz;
-            if (baseMhz <= 0) baseMhz = TargetMhz;
-            baseMhz = (int)(baseMhz / 15.0) * 15;
-            int best = baseMhz;
+            // Point de depart : la frequence mesuree a l'origine en jeu. La
+            // courbe stock a cette tension est bien plus basse : partir d'elle
+            // ne permettrait jamais d'atteindre le point de fonctionnement reel.
+            int baseMhz = (int)(target / 15.0) * 15;
             int maxMhz = _s.ClockMax > 0 ? _s.ClockMax : baseMhz + 120;
+            int best = 0;
 
-            UiProgress(string.Format("Frequence de reference {0} MHz a {1} mV", baseMhz, mvRetained), 68, 4);
-            TargetMhz = baseMhz;
-            WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
-            ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
-            var tb = DateTime.Now;
-            string rb = RunPythonStability(240);
-            bool okBase = ParseEcarts(rb) == 0 && ParseErreurs(rb) == 0 && CountXid(tb) == 0;
-            LogMsg(string.Format("package frequence {0} MHz (reference) -> {1}", baseMhz, rb.Replace("\n", " ")));
+            Func<int, int, bool> tryFrequency = (mhz, step) =>
+            {
+                UiProgress(string.Format("Frequence {0} MHz a {1} mV", mhz, mvRetained),
+                    70 + step * 2, Math.Max(1, (5 - step) * 4));
+
+                TargetMhz = mhz;
+                WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
+                ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
+
+                var t0 = DateTime.Now;
+                string r = RunPythonStability(240);
+                int e = ParseEcarts(r), er = ParseErreurs(r), xid = CountXid(t0);
+                bool ok = e == 0 && er == 0 && xid == 0;
+                LogMsg(string.Format("package frequence {0} MHz -> {1} (xid={2})",
+                    mhz, r.Replace("\n", " "), xid));
+                return ok;
+            };
+
+            UiProgress(string.Format("Frequence de depart {0} MHz a {1} mV", baseMhz, mvRetained), 68, 4);
+            bool okBase = tryFrequency(baseMhz, 0);
 
             if (okBase)
             {
+                best = baseMhz;
                 for (int step = 1; step <= 4; step++)
                 {
-                    int mhz = baseMhz + step * 15;
+                    int mhz = best + 15;
                     if (mhz > maxMhz) break;
-                    UiProgress(string.Format("Frequence {0} MHz a {1} mV", mhz, mvRetained),
-                        70 + step * 2, Math.Max(1, (5 - step) * 5));
-
-                    TargetMhz = mhz;
-                    WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
-                    ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
-                    var t0 = DateTime.Now;
-                    string r = RunPythonStability(240);
-                    int e = ParseEcarts(r), er = ParseErreurs(r), xid = CountXid(t0);
-                    bool ok = e == 0 && er == 0 && xid == 0;
-                    LogMsg(string.Format("package frequence {0} MHz -> {1} (xid={2})", mhz, r.Replace("\n", " "), xid));
-                    if (ok) best = mhz; else break;
+                    if (!tryFrequency(mhz, step)) break;
+                    best = mhz;
                 }
             }
             else
             {
-                LogMsg("package : la frequence de reference est instable, retour a la valeur d'origine");
-                best = Math.Min(baseMhz, TargetMhz);
+                LogMsg("package : frequence de depart instable, recherche vers le bas");
+                for (int step = 1; step <= 4; step++)
+                {
+                    int mhz = baseMhz - step * 15;
+                    if (mhz < 900) break;
+                    if (tryFrequency(mhz, step)) { best = mhz; break; }
+                }
+                if (best == 0) best = 900;
             }
 
             TargetMhz = best;

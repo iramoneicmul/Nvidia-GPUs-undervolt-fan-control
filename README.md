@@ -73,35 +73,15 @@ Release signing: `tools/sign-release.sh` (SHA256 + optional GPG).
 
 ---
 
-## GPU-Unlock tab
+## Languages
 
-[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) unlocks the FP/BF16
-instruction issue rate on GA102/GA103/GA104/GA106 cards, doubling it. It is a
-**Linux kernel module** loaded from the initramfs before the NVIDIA driver
-binds the card: it cannot be enabled from a Windows application.
+Six interface languages: **English (default)**, French, German, Spanish,
+Italian and Portuguese. The **Language** button in the bottom action bar opens
+the selector; the choice is stored in `C:\Nvidia\language.txt` and applied
+immediately (the application restarts itself).
 
-The tab therefore reports the real situation and **measures the potential**:
-
-| Precision | Measured (RTX 3080 Ti, 320 W) | Unlocked potential |
-|---|---|---|
-| FP16 | 71.7 TFLOPS | ~143 TFLOPS |
-| BF16 | 73.2 TFLOPS | ~146 TFLOPS |
-| TF32 | 36.6 TFLOPS | ~73 TFLOPS |
-| FP32 | 22.6 TFLOPS | not affected |
-
-The Windows port (`impacifist/Windows-GPU-UNLOCK`) is an experimental UEFI
-loader, validated on RTX 3060 / 3070 Ti / 3090 FE / 3090 Ti — **not on
-RTX 3080 Ti**. **Enable/disable is real**: when the Windows UEFI loader is present in
-`C:\Nvidia\gpu-unlock`, the tab drives the boot entry
-(`Headless.ps1 -EnableAutomatic -ConfirmedSuccess` / `-RestoreWindowsFirst`),
-after checking Secure Boot, BitLocker, loader presence and boot entry, with an
-explicit confirmation. The folder can be changed from the tab. After a reboot,
-a benchmark compared with the locked reference tells whether the unlock is
-actually active (> 50 % FP16 gain).
-
-Two caveats: the **power limit remains the limiting factor** (at 320 W the card
-runs out of power before issue rate), and **games gain nothing** (FP32 is not
-affected). The benefit concerns AI and FP16/BF16 compute.
+Field labels, tab titles, buttons, sections and status texts are translated.
+Technical log lines stay in French.
 
 ---
 

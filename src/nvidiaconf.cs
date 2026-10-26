@@ -468,6 +468,10 @@ internal sealed partial class MainForm : Form
         _btnPersist.Click += (o, e) => InstallPersistence();
         bottom.Controls.Add(_btnPersist);
 
+        var btnLang = MakeButton("Langue", 548, 80, 60);
+        btnLang.Click += (o, e) => ChooseLanguage(btnLang);
+        bottom.Controls.Add(btnLang);
+
         var btnTune = MakeButton("Trouver la configuration optimale", 16, 114, 340);
         btnTune.Click += (o, e) => AutoTune();
         bottom.Controls.Add(btnTune);
@@ -500,15 +504,14 @@ internal sealed partial class MainForm : Form
             Font = new Font("Segoe UI", 9f)
         };
 
-        var tIdent = new TabPage("Identite") { BackColor = Color.FromArgb(24, 24, 24) };
-        var tFreq = new TabPage("Frequences") { BackColor = Color.FromArgb(24, 24, 24) };
-        var tConf = new TabPage("Configuration") { BackColor = Color.FromArgb(24, 24, 24) };
-        var tLive = new TabPage("Temps reel") { BackColor = Color.FromArgb(24, 24, 24) };
-        var tSensors = new TabPage("Capteurs") { BackColor = Color.FromArgb(24, 24, 24) };
-        var tUnlock = new TabPage("GPU-Unlock") { BackColor = Color.FromArgb(24, 24, 24) };
-        var tReport = new TabPage("Rapport") { BackColor = Color.FromArgb(24, 24, 24) };
+        var tIdent = new TabPage(Lang.T("Identite")) { BackColor = Color.FromArgb(24, 24, 24) };
+        var tFreq = new TabPage(Lang.T("Frequences")) { BackColor = Color.FromArgb(24, 24, 24) };
+        var tConf = new TabPage(Lang.T("Configuration")) { BackColor = Color.FromArgb(24, 24, 24) };
+        var tLive = new TabPage(Lang.T("Temps reel")) { BackColor = Color.FromArgb(24, 24, 24) };
+        var tSensors = new TabPage(Lang.T("Capteurs")) { BackColor = Color.FromArgb(24, 24, 24) };
+        var tReport = new TabPage(Lang.T("Rapport")) { BackColor = Color.FromArgb(24, 24, 24) };
 
-        tabs.TabPages.AddRange(new TabPage[] { tIdent, tFreq, tConf, tLive, tSensors, tUnlock, tReport });
+        tabs.TabPages.AddRange(new TabPage[] { tIdent, tFreq, tConf, tLive, tSensors, tReport });
         Controls.Add(tabs);
         tabs.BringToFront();
 
@@ -591,7 +594,7 @@ internal sealed partial class MainForm : Form
 
         var lblReport = new Label
         {
-            Text = "Rapport comparatif",
+            Text = Lang.T("Rapport comparatif"),
             ForeColor = Color.Gray,
             AutoSize = false,
             Size = new Size(120, 18),
@@ -623,7 +626,6 @@ internal sealed partial class MainForm : Form
             "Ventilateur 1", "Ventilateur 2", "Charge GPU"
         });
         BuildLiveGraph(tLive, 8 + 10 * 21);
-        BuildUnlockTab(tUnlock);
     }
 
     // Ligne de saisie : libelle, zone de texte, aide. Retourne la zone de texte.
@@ -631,7 +633,7 @@ internal sealed partial class MainForm : Form
     {
         var lbl = new Label
         {
-            Text = label,
+            Text = Lang.T(label),
             ForeColor = Color.Silver,
             AutoSize = false,
             Size = new Size(150, 18),
@@ -652,7 +654,7 @@ internal sealed partial class MainForm : Form
 
         var help = new Label
         {
-            Text = hint,
+            Text = Lang.T(hint),
             ForeColor = Color.Gray,
             AutoSize = false,
             Size = new Size(190, 18),
@@ -666,7 +668,7 @@ internal sealed partial class MainForm : Form
     {
         var b = new Button
         {
-            Text = text,
+            Text = Lang.T(text),
             Location = new Point(x, y),
             Size = new Size(w, 28),
             FlatStyle = FlatStyle.Flat,
@@ -773,6 +775,37 @@ internal sealed partial class MainForm : Form
             _tray.ContextMenuStrip.Items.Insert(0, item);
         }
         catch { }
+    }
+
+    // Choix de la langue : menu, enregistrement, redemarrage de l'application.
+    private void ChooseLanguage(Control anchor)
+    {
+        var menu = new ContextMenuStrip();
+        for (int i = 0; i < Lang.Available.Length; i++)
+        {
+            string code = Lang.Available[i];
+            var item = new ToolStripMenuItem(Lang.Names[i]);
+            item.Checked = (code == Lang.Current);
+            item.Click += (o, e) => ApplyLanguage(code);
+            menu.Items.Add(item);
+        }
+        menu.Show(anchor, new Point(0, anchor.Height));
+    }
+
+    private void ApplyLanguage(string code)
+    {
+        if (code == Lang.Current) return;
+        Lang.Set(code);
+        LogMsg("langue : " + code);
+        try
+        {
+            // Relance differee : l'instance courante doit liberer son mutex.
+            Process.Start(new ProcessStartInfo("cmd.exe",
+                "/c timeout /t 2 >nul & start \"\" \"" + Application.ExecutablePath + "\" --tray")
+            { CreateNoWindow = true, UseShellExecute = false });
+        }
+        catch { }
+        Application.Exit();
     }
 
     private void Ui(Action a)
@@ -887,7 +920,7 @@ internal sealed partial class MainForm : Form
     {
         var box = new GroupBox
         {
-            Text = title,
+            Text = Lang.T(title),
             ForeColor = Color.FromArgb(150, 200, 60),
             Location = new Point(14, y),
             Size = new Size(532, 26 + keys.Length * 18),
@@ -897,7 +930,7 @@ internal sealed partial class MainForm : Form
         int ky = 20;
         foreach (string k in keys)
         {
-            var lk = new Label { Text = k, ForeColor = Color.Gray, AutoSize = false, Size = new Size(210, 17), Location = new Point(12, ky) };
+            var lk = new Label { Text = Lang.T(k), ForeColor = Color.Gray, AutoSize = false, Size = new Size(210, 17), Location = new Point(12, ky) };
             var lv = new Label { Text = "-", ForeColor = Color.WhiteSmoke, AutoSize = false, Size = new Size(290, 17), Location = new Point(226, ky), TextAlign = ContentAlignment.MiddleRight };
             box.Controls.Add(lk);
             box.Controls.Add(lv);
@@ -906,6 +939,14 @@ internal sealed partial class MainForm : Form
         }
         parent.Controls.Add(box);
         return y + box.Height + 8;
+    }
+
+    private static string FanText(int rpm, int pct)
+    {
+        if (rpm > 0 && pct >= 0) return rpm + " tr/min  (" + pct + " %)";
+        if (rpm > 0) return rpm + " tr/min";
+        if (pct >= 0) return pct + " %";
+        return "n/a";
     }
 
     private void Set(string key, string value)
@@ -960,8 +1001,9 @@ internal sealed partial class MainForm : Form
             BringToFront();
         }
 
-        // pendant un test, on evite de lancer nvidia-smi en concurrence
-        if (_busy && !full) return;
+        // Pendant un test, on continue a rafraichir l'interface : le verrou
+        // NVAPI interne empeche tout interblocage, et l'utilisateur garde des
+        // valeurs a jour (tension, puissance, temperatures).
         try
         {
             string q = Run(Smi, "--query-gpu=name,driver_version,vbios_version,pci.bus_id,pci.device_id,pci.sub_device_id,memory.total,memory.used,clocks.current.graphics,clocks.current.memory,clocks.max.graphics,clocks.max.memory,power.draw,power.limit,temperature.gpu,utilization.gpu,fan.speed,pcie.link.gen.current,pcie.link.gen.max,pcie.link.width.current,pcie.link.width.max --format=csv,noheader,nounits");
@@ -984,6 +1026,8 @@ internal sealed partial class MainForm : Form
                     _s.PowerNow = ParseDouble(p[12]);
                     _s.PowerLimit = ParseDouble(p[13]);
                     _s.Temp = ParseInt(p[14]); _s.GpuUsage = ParseInt(p[15]);
+                    int fanPct = ParseInt(p[16]);
+                    if (fanPct >= 0) _s.Fan1Pct = fanPct;
                 }
             }
 
@@ -994,11 +1038,22 @@ internal sealed partial class MainForm : Form
 
             int r1, c1, r2, c2;
             NvSensors.ReadFans(out r1, out c1, out r2, out c2);
-            _s.Fan1Rpm = r1; _s.Fan1Pct = c1; _s.Fan2Rpm = r2; _s.Fan2Pct = c2;
+            if (r1 > 0) _s.Fan1Rpm = r1;
+            if (c1 >= 0) _s.Fan1Pct = c1;
+            if (r2 > 0) _s.Fan2Rpm = r2;
+            if (c2 >= 0) _s.Fan2Pct = c2;
 
             string v = Run(Path.Combine(Root, "snu.exe"), "voltage");
             var mt = System.Text.RegularExpressions.Regex.Match(v, @"(\d+)\s*mV");
             if (mt.Success) _s.VoltageMv = int.Parse(mt.Groups[1].Value);
+            else if (_s.VoltageMv <= 0)
+            {
+                // nouvelle tentative unique : la premiere lecture au demarrage
+                // peut arriver avant que le pilote ne reponde
+                string v2 = Run(Path.Combine(Root, "snu.exe"), "voltage");
+                var mt2 = System.Text.RegularExpressions.Regex.Match(v2, @"(\d+)\s*mV");
+                if (mt2.Success) _s.VoltageMv = int.Parse(mt2.Groups[1].Value);
+            }
 
             // graphique temps reel
             if (_graph != null) _graph.Add(_s.Temp, _s.PowerNow, _s.ClockNow);
@@ -1196,8 +1251,8 @@ internal sealed partial class MainForm : Form
         Set("Temperature GPU", (_s.Temp > 0 ? _s.Temp + " C" : "n/a"));
         Set("Hotspot", (_s.Hotspot > 0 ? _s.Hotspot + " C" : "n/a"));
         Set("Temperature memoire", (_s.MemTemp > 0 ? _s.MemTemp + " C" : "n/a"));
-        Set("Ventilateur 1", _s.Fan1Rpm >= 0 ? (_s.Fan1Rpm + " tr/min  (" + _s.Fan1Pct + " %)") : "n/a");
-        Set("Ventilateur 2", _s.Fan2Rpm >= 0 ? (_s.Fan2Rpm + " tr/min  (" + _s.Fan2Pct + " %)") : "n/a");
+        Set("Ventilateur 1", FanText(_s.Fan1Rpm, _s.Fan1Pct));
+        Set("Ventilateur 2", FanText(_s.Fan2Rpm, _s.Fan2Pct));
         Set("Charge GPU", _s.GpuUsage + " %");
 
         UpdateSensors();
@@ -1434,10 +1489,11 @@ internal static class Program
         AppDomain.CurrentDomain.UnhandledException += (o, e) => Log("UNHANDLED " + e.ExceptionObject);
         Application.ThreadException += (o, e) => Log("THREAD " + e.Exception);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Log("demarrage args=" + string.Join(" ", args));
+        Lang.Load();
+        Log("demarrage args=" + string.Join(" ", args) + " langue=" + Lang.Current);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false, unlockStatus = false, unlockBench = false, unlockRef = false;
+        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i];
@@ -1449,9 +1505,6 @@ internal static class Program
             if (a == "--fantest") fanTest = true;
             if (a == "--package") packageTest = true;
             if (a == "--compare") compareTest = true;
-            if (a == "--unlock-status") unlockStatus = true;
-            if (a == "--unlock-bench") { unlockBench = true; }
-            if (a == "--reference") unlockRef = true;
             if (a == "--mhz" && i + 1 < args.Length)
             {
                 int v;
@@ -1482,18 +1535,6 @@ internal static class Program
                 if (fanTest) f.CliFanTest();
             }
             catch (Exception e) { Log("CLI test erreur : " + e.Message); }
-            return 0;
-        }
-
-        if (unlockStatus || unlockBench)
-        {
-            try
-            {
-                var uf = new MainForm(true, false);
-                if (unlockStatus) uf.CliUnlockStatus();
-                if (unlockBench) uf.CliUnlockBench(unlockRef);
-            }
-            catch (Exception e) { Log("unlock CLI " + e.Message); }
             return 0;
         }
 

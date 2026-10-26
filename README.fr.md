@@ -76,35 +76,15 @@ Signature des releases : `tools/sign-release.sh` (SHA256 + GPG facultatif).
 
 ---
 
-## Onglet GPU-Unlock
+## Langues
 
-[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) débloque le débit
-d'émission FP/BF16 des cartes GA102/GA103/GA104/GA106, en le doublant. C'est un
-**module noyau Linux** chargé dans l'initramfs avant que le pilote NVIDIA ne
-prenne la carte : il ne peut pas être activé depuis une application Windows.
+Six langues d'interface : **anglais (par défaut)**, français, allemand,
+espagnol, italien et portugais. Le bouton **Langue** de la barre d'actions ouvre
+le sélecteur ; le choix est conservé dans `C:\Nvidia\language.txt` et appliqué
+immédiatement (l'application se relance d'elle-même).
 
-L'onglet expose donc la situation réelle et **mesure le potentiel** :
-
-| Précision | Mesuré (RTX 3080 Ti, 320 W) | Potentiel déverrouillé |
-|---|---|---|
-| FP16 | 71,7 TFLOPS | ~143 TFLOPS |
-| BF16 | 73,2 TFLOPS | ~146 TFLOPS |
-| TF32 | 36,6 TFLOPS | ~73 TFLOPS |
-| FP32 | 22,6 TFLOPS | non concerné |
-
-Le port Windows (`impacifist/Windows-GPU-UNLOCK`) est un chargeur UEFI
-expérimental, validé sur RTX 3060 / 3070 Ti / 3090 FE / 3090 Ti — **pas sur
-RTX 3080 Ti**. **L'activation est réelle** : quand le chargeur UEFI Windows est présent dans
-`C:\Nvidia\gpu-unlock`, l'onglet pilote l'entrée de démarrage
-(`Headless.ps1 -EnableAutomatic -ConfirmedSuccess` / `-RestoreWindowsFirst`),
-après vérification de Secure Boot, BitLocker, de la présence du chargeur et de
-l'entrée de démarrage, avec confirmation explicite. Le dossier est modifiable
-depuis l'onglet. Après redémarrage, un benchmark comparé à la référence
-verrouillée indique si le déblocage est réellement actif (gain FP16 > 50 %).
-
-Deux réserves : le **power limit reste le facteur limitant** (à 320 W la carte
-sature en énergie avant l'issue rate), et **les jeux ne gagnent rien** (le FP32
-n'est pas concerné). Le bénéfice concerne l'IA et le calcul FP16/BF16.
+Les libellés de champs, titres d'onglets, boutons, sections et textes d'état
+sont traduits. Les lignes techniques du journal restent en français.
 
 ---
 
