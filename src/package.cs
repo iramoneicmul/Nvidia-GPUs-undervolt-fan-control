@@ -267,6 +267,7 @@ internal sealed partial class MainForm
         }
         else return m;
 
+        LogMsg("mesure : charge " + size + " lancee (" + seconds + " s)");
         Thread.Sleep(Math.Max(15, seconds / 3) * 1000);
 
         long sumMhz = 0, sumMv = 0, sumRpm = 0, n = 0;
@@ -291,6 +292,7 @@ internal sealed partial class MainForm
             Thread.Sleep(1000);
         }
 
+        LogMsg("mesure : charge " + size + " terminee, " + n + " echantillons");
         if (n > 0)
         {
             m.Mhz = (int)(sumMhz / n);
@@ -307,15 +309,9 @@ internal sealed partial class MainForm
     {
         try
         {
-            var psi = new ProcessStartInfo(Path.Combine(Root, "snu.exe"), "voltage")
-            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
-            using (var p = Process.Start(psi))
-            {
-                string o = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(4000);
-                var m = Regex.Match(o, @"(\d+)\s*mV");
-                if (m.Success) return int.Parse(m.Groups[1].Value);
-            }
+            string o = RunCapture(Path.Combine(Root, "snu.exe"), "voltage", 6000);
+            var m = Regex.Match(o, @"(\d+)\s*mV");
+            if (m.Success) return int.Parse(m.Groups[1].Value);
         }
         catch { }
         return 0;
@@ -325,16 +321,10 @@ internal sealed partial class MainForm
     {
         try
         {
-            var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
-                "--query-gpu=" + field + " --format=csv,noheader,nounits")
-            { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
-            using (var p = Process.Start(psi))
-            {
-                string o = p.StandardOutput.ReadToEnd().Trim();
-                p.WaitForExit(8000);
-                double v;
-                if (double.TryParse(o, NumberStyles.Any, CultureInfo.InvariantCulture, out v)) return v;
-            }
+            string o = RunCapture(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
+                "--query-gpu=" + field + " --format=csv,noheader,nounits", 8000).Trim();
+            double v;
+            if (double.TryParse(o, NumberStyles.Any, CultureInfo.InvariantCulture, out v)) return v;
         }
         catch { }
         return 0;

@@ -158,25 +158,45 @@ internal sealed partial class MainForm
         return n > 0 ? (int)(sum / n) : 0;
     }
 
-    private static int SmiInt(string field)
+    /// <summary>Execute un programme et capture sa sortie avec un delai maximal.
+    /// La lecture asynchrone evite tout blocage si le processus ne rend pas la main
+    /// (cas observe avec nvidia-smi sous forte charge).</summary>
+    private static string RunCapture(string exe, string args, int timeoutMs)
     {
         try
         {
-            string smiPath = System.IO.Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe");
-            var psi = new ProcessStartInfo(smiPath,
-                "--query-gpu=" + field + " --format=csv,noheader,nounits")
+            var psi = new ProcessStartInfo(exe, args)
             {
                 RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
             using (var p = Process.Start(psi))
             {
-                string o = p.StandardOutput.ReadToEnd().Trim();
-                p.WaitForExit(20000);
-                int v;
-                if (int.TryParse(o, out v)) return v;
+                var outTask = p.StandardOutput.ReadToEndAsync();
+                var errTask = p.StandardError.ReadToEndAsync();
+                if (!p.WaitForExit(timeoutMs))
+                {
+                    try { p.Kill(); } catch { }
+                    LogMsg("RunCapture timeout : " + Path.GetFileName(exe) + " " + args);
+                    return "";
+                }
+                return outTask.Wait(3000) ? outTask.Result : "";
             }
+        }
+        catch (Exception ex) { LogMsg("RunCapture " + ex.Message); return ""; }
+    }
+
+    private static int SmiInt(string field)
+    {
+        try
+        {
+            string smiPath = System.IO.Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe");
+            string o = RunCapture(smiPath,
+                "--query-gpu=" + field + " --format=csv,noheader,nounits", 8000).Trim();
+            int v;
+            if (int.TryParse(o, out v)) return v;
         }
         catch (Exception ex) { LogMsg("SmiInt " + field + " : " + ex.Message); }
         return 0;
