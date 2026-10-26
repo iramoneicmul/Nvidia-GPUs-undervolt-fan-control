@@ -279,6 +279,7 @@ internal sealed partial class MainForm : Form
     private Label _lProfile;
     private volatile bool _busy;
     public static volatile bool ShowRequested;
+    public static volatile bool PackageRequested;
 
     private readonly bool _startHidden;
 
@@ -816,6 +817,12 @@ internal sealed partial class MainForm : Form
 
     private void Refresh(bool full)
     {
+        if (PackageRequested)
+        {
+            PackageRequested = false;
+            PackageButton();
+        }
+
         if (ShowRequested)
         {
             ShowRequested = false;
@@ -1292,16 +1299,39 @@ internal static class Program
         var compat = Compatibility.Check(root);
         Log("compatibilite : " + (compat.Ok ? "OK" : "NON") + " / " + compat.GpuName);
 
-        if (freqTest || fanTest || packageTest)
+        if (freqTest || fanTest)
         {
             try
             {
                 var f = new MainForm(true, false);
                 if (freqTest) f.CliFrequencyTest();
                 if (fanTest) f.CliFanTest();
-                if (packageTest) f.CliPackage();
             }
             catch (Exception e) { Log("CLI test erreur : " + e.Message); }
+            return 0;
+        }
+
+        if (packageTest)
+        {
+            // On confie le test a l'instance deja en cours (icone de la zone de
+            // notification) pour que la progression s'affiche dans SA fenetre.
+            bool sent = false;
+            try
+            {
+                using (var ev = EventWaitHandle.OpenExisting("NvidiaConf.Package"))
+                {
+                    ev.Set();
+                    sent = true;
+                }
+            }
+            catch { }
+
+            if (sent) { Log("package : demande transmise a l'instance en cours"); return 0; }
+
+            // aucune instance : on lance une fenetre visible
+            var pf = new MainForm(false, false);
+            pf.StartPackageOnShown();
+            try { Application.Run(pf); } catch (Exception e) { Log("package erreur : " + e.Message); }
             return 0;
         }
 
@@ -1365,6 +1395,8 @@ internal static class Program
         }
 
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "NvidiaConf.Show");
+        EventWaitHandle packageEvent = null;
+        try { packageEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "NvidiaConf.Package"); } catch { }
 
         var form = new MainForm(hidden, tune);
         var wake = new Thread(() =>
@@ -1378,6 +1410,21 @@ internal static class Program
         });
         wake.IsBackground = true;
         wake.Start();
+
+        if (packageEvent != null)
+        {
+            var pkg = new Thread(() =>
+            {
+                while (true)
+                {
+                    packageEvent.WaitOne();
+                    MainForm.PackageRequested = true;
+                    MainForm.ShowRequested = true;   // amene la fenetre au premier plan
+                }
+            });
+            pkg.IsBackground = true;
+            pkg.Start();
+        }
 
         EnsureConfigurationApplied(root);
         EnsureTasks(root);

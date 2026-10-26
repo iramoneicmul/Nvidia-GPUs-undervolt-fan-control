@@ -112,8 +112,8 @@ optionnels (installables depuis l'application).
 ### Empreintes SHA-256
 
 ```
-a1caee31f1c7a42362c559b9034301195f059af839cacbe3c80668107fc28758  nvidiaconf.exe
-be3f5e0da5b79ac7aa38aeb1b769740ef4709c2a3616a21d8ddfee3f5719ce8e  nvidiaconf.msi
+4b150dfe3e3e7ecf5a930d6b18e3bd0f3c8be015c97312cf95c1a754339f8ff6  nvidiaconf.exe
+d47d79ddfa829d526b0fe6531a1ee5be0ec6bac92d2d02b0c779fe566de4fb01  nvidiaconf.msi
 ```
 
 ---
@@ -226,6 +226,6 @@ Windows 10/11 x64, NVIDIA driver, .NET Framework 4.8. Python + PyTorch optional
 ### SHA-256
 
 ```
-a1caee31f1c7a42362c559b9034301195f059af839cacbe3c80668107fc28758  nvidiaconf.exe
-be3f5e0da5b79ac7aa38aeb1b769740ef4709c2a3616a21d8ddfee3f5719ce8e  nvidiaconf.msi
+4b150dfe3e3e7ecf5a930d6b18e3bd0f3c8be015c97312cf95c1a754339f8ff6  nvidiaconf.exe
+d47d79ddfa829d526b0fe6531a1ee5be0ec6bac92d2d02b0c779fe566de4fb01  nvidiaconf.msi
 ```
