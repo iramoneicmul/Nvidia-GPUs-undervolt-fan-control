@@ -461,3 +461,81 @@ d'une consigne hors limites. Dernier passage : **19 OK, 0 échec**.
 ```
 
 Produit `SHA256SUMS` et, si une clé GPG existe, `SHA256SUMS.asc`.
+
+---
+
+## 14. Onglet GPU-Unlock (v1.4.0 / 1.4.1)
+
+### 14.1 Ce qu'est gpu-unlock
+
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) est un **module
+noyau Linux** chargé dans l'initramfs, **avant** que le pilote `nvidia` ne
+prenne la carte. Il écrit les sélecteurs de vitesse (SS0 `0x88888888`, SS1
+`0x8`) et effectue un FLR. Effet : **doublement du débit d'émission FP/BF16**
+sur GA102, GA103, GA104 et GA106.
+
+Gains publiés (3090 Ti, 450 W) :
+
+| Entrée | Avant | Après |
+|---|---|---|
+| FP16 | 87,46 TFLOPS | 118,39 TFLOPS |
+| BF16 | 87,50 TFLOPS | 157,41 TFLOPS |
+| TF32 | 42,58 TFLOPS | 82,61 TFLOPS |
+
+### 14.2 Pourquoi l'activation Windows est impossible
+
+| Point | Constat |
+|---|---|
+| Type de composant | module noyau Linux, pas un service ni un pilote Windows |
+| Moment d'action | initramfs, avant le binding du pilote NVIDIA |
+| API disponible | aucune : rien à appeler depuis une application Windows |
+| Port Windows | `impacifist/Windows-GPU-UNLOCK`, **chargeur UEFI expérimental** |
+| Prérequis du port | Secure Boot désactivé, BitLocker désactivé, ESP dédiée ≥ 1 Gio, build local (clang/lld 20.1.8, 5 firmwares) |
+| Profils validés | RTX 3060 12 Go, 3070 Ti, 3090 FE, 3090 Ti |
+| RTX 3080 Ti | **aucun profil validé** |
+
+Le bouton « Activer gpu-unlock » **n'active donc rien** : il explique la
+situation, liste les profils existants et renvoie vers les projets. Il a été
+conçu ainsi volontairement : un bouton qui prétendrait activer un module
+absent serait trompeur.
+
+### 14.3 Ce que fait réellement l'onglet
+
+1. **État de compatibilité** : carte, architecture, nature du moteur, profils
+   Windows validés, statut de la carte installée.
+2. **Boutons** : Activer (explication), Désactiver (explication), Mesurer les
+   performances, Ouvrir le projet, Port Windows.
+3. **Benchmark réel** (`unlock-bench.py`) : quatre multiplications matricielles
+   8192³ de 5 s (FP16, BF16, TF32, FP32) et calcul des TFLOPS.
+4. **Chiffrage du gain** : débit actuel, potentiel déverrouillé (+100 %), gain
+   public observé (×1,88 à ×1,95) et rappel du power limit.
+
+### 14.4 Résultats mesurés sur Hellfire (RTX 3080 Ti, 320 W)
+
+| Précision | Débit mesuré | Potentiel déverrouillé |
+|---|---|---|
+| FP16 | 71,7 TFLOPS | ~143 TFLOPS |
+| BF16 | 73,2 TFLOPS | ~146 TFLOPS |
+| TF32 | 36,6 TFLOPS | ~73 TFLOPS |
+| FP32 | 22,6 TFLOPS | non concerné |
+
+Deux réserves importantes :
+
+1. **Le power limit reste le facteur limitant** : à 320 W, la carte sature
+   énergétiquement avant de saturer l'issue rate. Le gain réel serait donc
+   inférieur à +100 % sans augmenter le PL.
+2. **Aucun gain en jeu** : les jeux utilisent FP32, que le déblocage ne touche
+   pas. Le bénéfice concerne l'IA et le calcul FP16/BF16.
+
+### 14.5 Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `unlock-bench.py` | benchmark FP16/BF16/TF32/FP32 (embarqué dans le MSI) |
+| `unlock-bench.txt` | dernier résultat (`RESULTAT taille=... FP16=...`) |
+
+Commande directe équivalente :
+
+```powershell
+python C:\Nvidia\unlock-bench.py 8192 C:\Nvidia\unlock-bench.txt
+```

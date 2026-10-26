@@ -505,9 +505,10 @@ internal sealed partial class MainForm : Form
         var tConf = new TabPage("Configuration") { BackColor = Color.FromArgb(24, 24, 24) };
         var tLive = new TabPage("Temps reel") { BackColor = Color.FromArgb(24, 24, 24) };
         var tSensors = new TabPage("Capteurs") { BackColor = Color.FromArgb(24, 24, 24) };
+        var tUnlock = new TabPage("GPU-Unlock") { BackColor = Color.FromArgb(24, 24, 24) };
         var tReport = new TabPage("Rapport") { BackColor = Color.FromArgb(24, 24, 24) };
 
-        tabs.TabPages.AddRange(new TabPage[] { tIdent, tFreq, tConf, tLive, tSensors, tReport });
+        tabs.TabPages.AddRange(new TabPage[] { tIdent, tFreq, tConf, tLive, tSensors, tUnlock, tReport });
         Controls.Add(tabs);
         tabs.BringToFront();
 
@@ -622,6 +623,7 @@ internal sealed partial class MainForm : Form
             "Ventilateur 1", "Ventilateur 2", "Charge GPU"
         });
         BuildLiveGraph(tLive, 8 + 10 * 21);
+        BuildUnlockTab(tUnlock);
     }
 
     // Ligne de saisie : libelle, zone de texte, aide. Retourne la zone de texte.

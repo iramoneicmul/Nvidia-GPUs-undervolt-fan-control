@@ -68,6 +68,218 @@ internal sealed partial class MainForm
         }
     }
 
+    // ==================================================================
+    //  Onglet GPU-Unlock : etat, activation, mesure des gains
+    // ==================================================================
+    private Label _unlockState;
+    private Label _unlockGain;
+
+    private void BuildUnlockTab(TabPage page)
+    {
+        int y = 8;
+
+        var title = new Label
+        {
+            Text = "GPU-Unlock (Zagitta) - debit FP/BF16",
+            ForeColor = Color.FromArgb(150, 200, 60),
+            Font = new Font("Segoe UI", 11f, FontStyle.Bold),
+            AutoSize = false,
+            Size = new Size(560, 26),
+            Location = new Point(18, y)
+        };
+        page.Controls.Add(title);
+        y += 34;
+
+        _unlockState = new Label
+        {
+            ForeColor = Color.Gainsboro,
+            AutoSize = false,
+            Size = new Size(566, 150),
+            Location = new Point(18, y)
+        };
+        page.Controls.Add(_unlockState);
+        y += 158;
+
+        var btnOn = MakeButton("Activer gpu-unlock", 18, y, 190);
+        btnOn.Click += (o, e) => UnlockActivate();
+        page.Controls.Add(btnOn);
+
+        var btnOff = MakeButton("Desactiver", 216, y, 120);
+        btnOff.Click += (o, e) => UnlockDeactivate();
+        page.Controls.Add(btnOff);
+
+        var btnBench = MakeButton("Mesurer les performances", 344, y, 240);
+        btnBench.Click += (o, e) => UnlockBenchmark();
+        page.Controls.Add(btnBench);
+        y += 42;
+
+        var btnDoc = MakeButton("Ouvrir le projet gpu-unlock", 18, y, 280);
+        btnDoc.Click += (o, e) => Process.Start("https://github.com/Zagitta/gpu-unlock");
+        page.Controls.Add(btnDoc);
+
+        var btnWin = MakeButton("Port Windows (UEFI)", 306, y, 200);
+        btnWin.Click += (o, e) => Process.Start("https://github.com/impacifist/Windows-GPU-UNLOCK");
+        page.Controls.Add(btnWin);
+        y += 46;
+
+        _unlockGain = new Label
+        {
+            ForeColor = Color.Gray,
+            AutoSize = false,
+            Size = new Size(566, 150),
+            Location = new Point(18, y)
+        };
+        page.Controls.Add(_unlockGain);
+
+        RefreshUnlockState();
+    }
+
+    private string UnlockArchitecture()
+    {
+        string n = (_s.Name ?? "").ToUpperInvariant();
+        if (n.Contains("3080 TI") || n.Contains("3090") || n.Contains("3080") || n.Contains("3070")) return "GA102/GA104";
+        if (n.Contains("3060")) return "GA104/GA106";
+        if (n.Contains("2080") || n.Contains("2070") || n.Contains("2060")) return "TU104/TU106 (Turing)";
+        if (n.Contains("4070") || n.Contains("4080") || n.Contains("4090")) return "AD102/AD103/AD104 (Ada)";
+        return "inconnue";
+    }
+
+    private void RefreshUnlockState()
+    {
+        if (_unlockState == null) return;
+
+        string arch = UnlockArchitecture();
+        bool windowsPort = _s.Name != null &&
+            (_s.Name.ToUpperInvariant().Contains("3090") || _s.Name.ToUpperInvariant().Contains("3070 TI") ||
+             _s.Name.ToUpperInvariant().Contains("3060"));
+
+        _unlockState.Text =
+            "Carte          : " + (_s.Name ?? "inconnue") + Environment.NewLine +
+            "Architecture   : " + arch + Environment.NewLine +
+            "Moteur gpu-unlock : module noyau Linux (initramfs, avant le pilote NVIDIA)" + Environment.NewLine +
+            "Windows        : non applicable tel quel - aucun service ni pilote a activer" + Environment.NewLine +
+            "Port Windows   : chargeur UEFI experimental (impacifist/Windows-GPU-UNLOCK)" + Environment.NewLine +
+            "Profils valides: RTX 3060, 3070 Ti, 3090 FE, 3090 Ti" + Environment.NewLine +
+            "Cette carte    : " + (windowsPort ? "profil existant (resultat variable)" : "AUCUN profil valide a ce jour") + Environment.NewLine +
+            Environment.NewLine +
+            "Effet attendu  : x2 sur le debit FP/BF16 (issue rate), ~x1.9 mesure en pratique.";
+
+        _unlockState.ForeColor = windowsPort ? Color.Gainsboro : Color.FromArgb(230, 170, 90);
+    }
+
+    private void UnlockActivate()
+    {
+        RefreshUnlockState();
+        LogMsg("gpu-unlock : demande d'activation");
+        MessageBox.Show(
+            "gpu-unlock ne peut pas etre active depuis Windows.\n\n" +
+            "1. Le projet de reference (Zagitta/gpu-unlock) est un MODULE NOYAU LINUX,\n" +
+            "   charge dans l'initramfs avant le pilote NVIDIA. Il n'existe ni\n" +
+            "   service ni interface Windows.\n\n" +
+            "2. Le port Windows (impacifist/Windows-GPU-UNLOCK) est un chargeur UEFI\n" +
+            "   experimental : Secure Boot desactive, BitLocker desactive, partition\n" +
+            "   EFI dediee, build local (clang/lld, 5 firmwares), profil materiel precis.\n\n" +
+            "3. Profils valides : RTX 3060, 3070 Ti, 3090 FE, 3090 Ti.\n" +
+            "   La RTX 3080 Ti n'a aucun profil valide.\n\n" +
+            "Utilisez « Mesurer les performances » pour chiffrer le gain potentiel\n" +
+            "sur cette carte avant toute manipulation.",
+            "GPU-Unlock", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void UnlockDeactivate()
+    {
+        LogMsg("gpu-unlock : demande de desactivation");
+        MessageBox.Show(
+            "Rien a desactiver : gpu-unlock n'est pas actif sous Windows.\n\n" +
+            "Sur une installation Linux, il suffit de retirer gpu_unlock.targets=\n" +
+            "de la ligne de commande du noyau, ou de desinstaller le paquet.",
+            "GPU-Unlock", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void UnlockBenchmark()
+    {
+        if (_busy) return;
+        string py = ResolvePython();
+        if (py == null)
+        {
+            MessageBox.Show("PyTorch est requis pour mesurer les debits FP16/BF16.",
+                "GPU-Unlock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _busy = true;
+        if (_timer != null) _timer.Stop();
+        UiProgress("Mesure des debits FP16 / BF16 / TF32 / FP32", 5, 1);
+
+        var th = new Thread(() =>
+        {
+            try
+            {
+                string outFile = Path.Combine(Root, "unlock-bench.txt");
+                try { File.Delete(outFile); } catch { }
+                var psi = new ProcessStartInfo(py,
+                    "\"C:\\Nvidia\\unlock-bench.py\" 8192 \"" + outFile + "\"")
+                { UseShellExecute = false, CreateNoWindow = true };
+                using (var p = Process.Start(psi)) p.WaitForExit(180000);
+
+                string res = "";
+                try { res = File.ReadAllText(outFile).Trim(); } catch { }
+                LogMsg("gpu-unlock benchmark : " + res.Replace("\n", " "));
+
+                double fp16 = 0, bf16 = 0, tf32 = 0, fp32 = 0;
+                foreach (string line in res.Split('\n'))
+                {
+                    var kv = line.Split('=');
+                    if (kv.Length != 2) continue;
+                    double v;
+                    if (!double.TryParse(kv[1].Trim(), System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out v)) continue;
+                    if (kv[0].Trim() == "FP16") fp16 = v;
+                    if (kv[0].Trim() == "BF16") bf16 = v;
+                    if (kv[0].Trim() == "TF32") tf32 = v;
+                    if (kv[0].Trim() == "FP32") fp32 = v;
+                }
+
+                string gain =
+                    "Debit mesure (8192 x 8192, 5 s par test)" + Environment.NewLine +
+                    string.Format("  FP16 : {0,7:0.0} TFLOPS   potentiel deverrouille {1,7:0.0} (+100 %)\n", fp16, fp16 * 2) +
+                    string.Format("  BF16 : {0,7:0.0} TFLOPS   potentiel deverrouille {1,7:0.0} (+100 %)\n", bf16, bf16 * 2) +
+                    string.Format("  TF32 : {0,7:0.0} TFLOPS   potentiel deverrouille {1,7:0.0} (+100 %)\n", tf32, tf32 * 2) +
+                    string.Format("  FP32 : {0,7:0.0} TFLOPS   non concerne par le deblocage\n", fp32) +
+                    Environment.NewLine +
+                    "Gain mesure dans les rapports publics : x1.88 a x1.95 (FP16/BF16/TF32).\n" +
+                    "Concerne uniquement l'IA et le calcul FP16/BF16.\n" +
+                    "Jeux (FP32) : aucun gain attendu.\n" +
+                    Environment.NewLine +
+                    string.Format("Power limit actuel : {0:0} W. A cette puissance, la carte est deja\n", _s.PowerLimit) +
+                    "bridee par l'energie avant de l'etre par l'issue rate : le gain reel\n" +
+                    "serait donc inferieur a +100 %, sauf a augmenter le power limit.";
+
+                Ui(() =>
+                {
+                    _unlockGain.Text = gain;
+                    _bar.Value = 100;
+                    _step.Text = "Mesure terminee.";
+                });
+            }
+            catch (Exception e)
+            {
+                LogMsg("gpu-unlock benchmark : " + e.Message);
+                Ui(() => { _step.Text = "Mesure impossible : " + e.Message; });
+            }
+            finally
+            {
+                Ui(() =>
+                {
+                    if (_timer != null) _timer.Start();
+                    _busy = false;
+                });
+            }
+        });
+        th.IsBackground = true;
+        th.Start();
+    }
+
     private void BuildSensorsTab(TabPage page)
     {
         _grid = new DataGridView

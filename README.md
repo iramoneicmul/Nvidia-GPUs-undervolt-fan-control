@@ -73,6 +73,33 @@ Release signing: `tools/sign-release.sh` (SHA256 + optional GPG).
 
 ---
 
+## GPU-Unlock tab
+
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) unlocks the FP/BF16
+instruction issue rate on GA102/GA103/GA104/GA106 cards, doubling it. It is a
+**Linux kernel module** loaded from the initramfs before the NVIDIA driver
+binds the card: it cannot be enabled from a Windows application.
+
+The tab therefore reports the real situation and **measures the potential**:
+
+| Precision | Measured (RTX 3080 Ti, 320 W) | Unlocked potential |
+|---|---|---|
+| FP16 | 71.7 TFLOPS | ~143 TFLOPS |
+| BF16 | 73.2 TFLOPS | ~146 TFLOPS |
+| TF32 | 36.6 TFLOPS | ~73 TFLOPS |
+| FP32 | 22.6 TFLOPS | not affected |
+
+The Windows port (`impacifist/Windows-GPU-UNLOCK`) is an experimental UEFI
+loader, validated on RTX 3060 / 3070 Ti / 3090 FE / 3090 Ti — **not on
+RTX 3080 Ti**. The enable/disable buttons explain this and link to both
+projects instead of pretending to activate something.
+
+Two caveats: the **power limit remains the limiting factor** (at 320 W the card
+runs out of power before issue rate), and **games gain nothing** (FP32 is not
+affected). The benefit concerns AI and FP16/BF16 compute.
+
+---
+
 ## Compatibility
 
 The application does **not** rely on a model list — it checks capabilities at
@@ -425,8 +452,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-6a84de45747d093c87c9f392af456c947f2054b69874c225828b9952d78817d7  nvidiaconf.exe
-5b790c5f0e0c39cd5a94d49bd6887c301429de505f1f6b8bf7102354013d7c05  nvidiaconf.msi
+0e4e4730875792ebe2d8d4bca28e81b4f0db25dc0732e3ba939d86c41903a847  nvidiaconf.exe
+66063ceb736754c8dc2c7995f1287677b3b349690215b90279e1e160d33ed08c  nvidiaconf.msi
 ```
 
 ### First run

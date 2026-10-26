@@ -76,6 +76,33 @@ Signature des releases : `tools/sign-release.sh` (SHA256 + GPG facultatif).
 
 ---
 
+## Onglet GPU-Unlock
+
+[Zagitta/gpu-unlock](https://github.com/Zagitta/gpu-unlock) débloque le débit
+d'émission FP/BF16 des cartes GA102/GA103/GA104/GA106, en le doublant. C'est un
+**module noyau Linux** chargé dans l'initramfs avant que le pilote NVIDIA ne
+prenne la carte : il ne peut pas être activé depuis une application Windows.
+
+L'onglet expose donc la situation réelle et **mesure le potentiel** :
+
+| Précision | Mesuré (RTX 3080 Ti, 320 W) | Potentiel déverrouillé |
+|---|---|---|
+| FP16 | 71,7 TFLOPS | ~143 TFLOPS |
+| BF16 | 73,2 TFLOPS | ~146 TFLOPS |
+| TF32 | 36,6 TFLOPS | ~73 TFLOPS |
+| FP32 | 22,6 TFLOPS | non concerné |
+
+Le port Windows (`impacifist/Windows-GPU-UNLOCK`) est un chargeur UEFI
+expérimental, validé sur RTX 3060 / 3070 Ti / 3090 FE / 3090 Ti — **pas sur
+RTX 3080 Ti**. Les boutons Activer/Désactiver expliquent cette situation et
+renvoient vers les deux projets, au lieu de simuler une activation.
+
+Deux réserves : le **power limit reste le facteur limitant** (à 320 W la carte
+sature en énergie avant l'issue rate), et **les jeux ne gagnent rien** (le FP32
+n'est pas concerné). Le bénéfice concerne l'IA et le calcul FP16/BF16.
+
+---
+
 ## Compatibilité
 
 L'application ne se base **pas** sur une liste de modèles : elle vérifie les
@@ -439,8 +466,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-6a84de45747d093c87c9f392af456c947f2054b69874c225828b9952d78817d7  nvidiaconf.exe
-5b790c5f0e0c39cd5a94d49bd6887c301429de505f1f6b8bf7102354013d7c05  nvidiaconf.msi
+0e4e4730875792ebe2d8d4bca28e81b4f0db25dc0732e3ba939d86c41903a847  nvidiaconf.exe
+66063ceb736754c8dc2c7995f1287677b3b349690215b90279e1e160d33ed08c  nvidiaconf.msi
 ```
 
 ### Premier lancement
