@@ -149,7 +149,7 @@ internal sealed partial class MainForm
         for (int i = lines.Count - 1; i >= 0; i--)
         {
             var p = lines[i];
-            grid.Rows.Add(new object[] { p[0], p[1], p[2], p[3] + " W", p[4] });
+            grid.Rows.Add(new object[] { p[0], p[1], p[2], p[3] + " W", Lang.Profile(p[4]) });
         }
 
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 44, BackColor = Color.FromArgb(28, 28, 28) };

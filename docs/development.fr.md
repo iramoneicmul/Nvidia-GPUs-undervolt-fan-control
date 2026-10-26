@@ -660,3 +660,22 @@ erreurs    : aucune
 | Journal technique en français | choix de lisibilité pour le dépannage |
 | Mono-GPU | l'outil pilote la première carte renvoyée par NVAPI |
 | Mise à jour non automatique | notification + lien seulement, par choix de sécurité |
+
+---
+
+## 18. Régression d'historique corrigée (v1.9.5)
+
+Deux défauts introduits en v1.9.4, dans le bouton « Appliquer » :
+
+| Défaut | Conséquence | Correction |
+|---|---|---|
+| profil enregistré avec un nom **traduit** (`balanced` au lieu de `equilibre`) | la restauration cherchait `profil-balanced.txt`, inexistant : le profil n'était jamais restauré, sans message | le **nom interne** est toujours enregistré |
+| fréquence et tension enregistrées à `0 MHz / 0 mV` | historique inutilisable | lecture réelle dans `plateau-active.json` (`ReadActivePoint`) |
+
+L'affichage de l'historique traduit désormais le profil (`quiet`, `balanced`,
+`cool`) sans changer la valeur stockée, qui reste le nom de fichier utilisé par
+la restauration.
+
+Leçon : les régressions venaient de mon propre correctif précédent, pas du code
+d'origine. Toute modification du bouton « Appliquer » doit être suivie d'un
+contrôle de `history.txt` et de `power-limit.txt`.

@@ -843,6 +843,25 @@ internal sealed partial class MainForm : Form
         }
     }
 
+    // Point de fonctionnement de la courbe active (tension / frequence).
+    private void ReadActivePoint(out int mhz, out int mv)
+    {
+        mhz = 0; mv = 0;
+        try
+        {
+            string f = Path.Combine(Root, "plateau-active.json");
+            if (!File.Exists(f)) return;
+            var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f),
+                "\"mv\"\\s*:\\s*(\\d+)\\s*,\\s*\"offset\"\\s*:\\s*-?\\d+\\s*,\\s*\"mhz\"\\s*:\\s*(\\d+)");
+            if (m.Success)
+            {
+                mv = int.Parse(m.Groups[1].Value);
+                mhz = int.Parse(m.Groups[2].Value);
+            }
+        }
+        catch { }
+    }
+
     private void ApplyConfig()
     {
         // Configuration active si elle existe, sinon la reference.
@@ -881,7 +900,11 @@ internal sealed partial class MainForm : Form
                     break;
                 case 2:
                     Ps("& '" + Path.Combine(Root, "snu.exe") + "' status | Out-Null");
-                    AppendHistory(0, 0, pl, Lang.Current == "fr" ? "equilibre" : "balanced");
+                    int histMhz, histMv;
+                    ReadActivePoint(out histMhz, out histMv);
+                    // Toujours le nom interne du profil : la restauration
+                    // cherche profil-<nom>.txt, independamment de la langue.
+                    AppendHistory(histMhz, histMv, pl, "equilibre");
                     break;
                 case 3:
                     Ps("Get-Service NvidiaFanCurve -ErrorAction SilentlyContinue | Out-Null");
