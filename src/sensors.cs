@@ -124,6 +124,12 @@ internal sealed partial class MainForm
     // ------------------------------------------------------------------
     //  Test automatique des trois profils de ventilation
     // ------------------------------------------------------------------
+    public void CliFanTest()
+    {
+        try { DoTestFanProfiles(); }
+        catch (Exception e) { LogMsg("CliFanTest " + e.Message); }
+    }
+
     private void TestFanProfiles()
     {
         if (_busy) return;
@@ -189,10 +195,12 @@ internal sealed partial class MainForm
                 int r1, c1, r2, c2;
                 NvSensors.ReadFans(out r1, out c1, out r2, out c2);
                 if (r1 > 0) { sumRpm += r1; n++; if (r1 > maxRpm) maxRpm = r1; }
+
+                int gpuNv, hNv, memNv;
+                NvSensors.ReadTemps(out gpuNv, out hNv, out memNv);
+                if (gpuNv > gpu) gpu = gpuNv;
                 if (gpu > maxGpu) maxGpu = gpu;
-                int hm, mm;
-                NvSensors.ReadTemps(out gpu, out hm, out mm);
-                if (mm > maxMem) maxMem = mm;
+                if (memNv > maxMem) maxMem = memNv;
                 Thread.Sleep(2000);
             }
 

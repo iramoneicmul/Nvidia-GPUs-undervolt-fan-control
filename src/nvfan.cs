@@ -101,6 +101,29 @@ internal struct FanCoolersControl
     public FanControlEntry[] entries;
 }
 
+// --- API classique (Maxwell / Pascal / avant RTX) ---
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
+internal struct LegacyCoolerLevel
+{
+    public uint coolerId;
+    public short currentLevel;
+    public short defaultLevel;
+    public uint currentPolicy;
+    public uint defaultPolicy;
+    public uint target;
+    public uint controlType;
+    public uint active;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
+internal struct LegacyCoolerSettings
+{
+    public uint version;
+    public uint count;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 20)]
+    public LegacyCoolerLevel[] level;
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
 internal struct ThermalSensor
 {
@@ -151,6 +174,9 @@ internal sealed class NvApi
     private const uint ID_FanSetControl = 0xA58971A5;
     private const uint ID_GetThermal = 0xE3640A56;
     private const uint ID_GetAllTemps = 0x65FE3AAD;
+    private const uint ID_GetCoolerSettings = 0xDA141340;
+    private const uint ID_SetCoolerLevels = 0x891FA0AE;
+    private const uint ID_GetTach = 0x5F608315;
 
     [DllImport("nvapi64.dll", EntryPoint = "nvapi_QueryInterface", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr QueryInterface(uint id);
@@ -162,6 +188,9 @@ internal sealed class NvApi
     private delegate uint D_FanControl(IntPtr gpu, ref FanCoolersControl control);
     private delegate uint D_Thermal(IntPtr gpu, uint sensorIndex, ref ThermalSettings settings);
     private delegate uint D_TempsEx(IntPtr gpu, ref ThermalSensorsEx sensors);
+    private delegate uint D_GetCooler(IntPtr gpu, uint index, ref LegacyCoolerSettings settings);
+    private delegate uint D_SetCooler(IntPtr gpu, uint index, ref LegacyCoolerSettings levels);
+    private delegate uint D_Tach(IntPtr gpu, out uint rpm);
 
     private D_Init _init;
     private D_Enum _enum;
@@ -171,6 +200,10 @@ internal sealed class NvApi
     private D_FanControl _setControl;
     private D_Thermal _thermal;
     private D_TempsEx _tempsEx;
+    private D_GetCooler _getCooler;
+    private D_SetCooler _setCooler;
+    private D_Tach _tach;
+    private bool _legacy;
     private IntPtr _gpu;
     private bool _ready;
 
@@ -198,12 +231,34 @@ internal sealed class NvApi
             _thermal = Bind<D_Thermal>(ID_GetThermal);
             _tempsEx = Bind<D_TempsEx>(ID_GetAllTemps);
 
+            try
+            {
+                _getCooler = Bind<D_GetCooler>(ID_GetCoolerSettings);
+                _setCooler = Bind<D_SetCooler>(ID_SetCoolerLevels);
+                _tach = Bind<D_Tach>(ID_GetTach);
+            }
+            catch { _getCooler = null; _setCooler = null; _tach = null; }
+
             if (_init() != OK) return false;
 
             var handles = new IntPtr[MAX_GPUS];
             uint n;
             if (_enum(handles, out n) != OK || n == 0) return false;
             _gpu = handles[0];
+
+            // RTX : ClientFanCoolers. Maxwell/Pascal : API classique.
+            _legacy = false;
+            try
+            {
+                var probe = new FanCoolersInfo();
+                probe.version = (uint)Marshal.SizeOf(typeof(FanCoolersInfo)) | (1u << 16);
+                probe.reserved = new uint[8];
+                probe.entries = new FanInfoEntry[32];
+                for (int k = 0; k < 32; k++) probe.entries[k].reserved = new uint[8];
+                if (_info(_gpu, ref probe) != OK) _legacy = true;
+            }
+            catch { _legacy = true; }
+
             _ready = true;
             return true;
         }
@@ -220,8 +275,41 @@ internal sealed class NvApi
         _gpu = IntPtr.Zero;
     }
 
+    public bool Legacy { get { return _legacy; } }
+
+    private LegacyCoolerSettings ReadLegacy()
+    {
+        if (_getCooler == null) throw new InvalidOperationException("API classique indisponible");
+        var s = new LegacyCoolerSettings();
+        s.version = (uint)Marshal.SizeOf(typeof(LegacyCoolerSettings)) | (1u << 16);
+        s.level = new LegacyCoolerLevel[20];
+        uint st = _getCooler(_gpu, 0, ref s);
+        if (st != OK) throw new InvalidOperationException("GetCoolerSettings : " + st);
+        return s;
+    }
+
+    private void WriteLegacy(LegacyCoolerSettings s)
+    {
+        if (_setCooler == null) throw new InvalidOperationException("API classique indisponible");
+        uint st = _setCooler(_gpu, 0, ref s);
+        if (st != OK) throw new InvalidOperationException("SetCoolerLevels : " + st);
+    }
+
     public FanCoolersInfo GetInfo()
     {
+        if (_legacy)
+        {
+            var fake = new FanCoolersInfo();
+            fake.version = (uint)Marshal.SizeOf(typeof(FanCoolersInfo)) | (1u << 16);
+            fake.reserved = new uint[8];
+            fake.entries = new FanInfoEntry[32];
+            for (int k = 0; k < 32; k++) fake.entries[k].reserved = new uint[8];
+            fake.count = 1;
+            fake.entries[0].coolerId = 0;
+            fake.entries[0].maxRpm = 0;
+            return fake;
+        }
+
         var i = new FanCoolersInfo();
         i.version = (uint)Marshal.SizeOf(typeof(FanCoolersInfo)) | (1u << 16);
         i.reserved = new uint[8];
@@ -234,6 +322,25 @@ internal sealed class NvApi
 
     public FanCoolersStatus GetStatus()
     {
+        if (_legacy)
+        {
+            var l = ReadLegacy();
+            uint rpm = 0;
+            try { if (_tach != null) _tach(_gpu, out rpm); } catch { }
+            var fake = new FanCoolersStatus();
+            fake.version = (uint)Marshal.SizeOf(typeof(FanCoolersStatus)) | (1u << 16);
+            fake.reserved = new uint[8];
+            fake.entries = new FanStatusEntry[32];
+            for (int k = 0; k < 32; k++) fake.entries[k].reserved = new uint[8];
+            fake.count = 1;
+            fake.entries[0].coolerId = 0;
+            fake.entries[0].currentRpm = rpm;
+            fake.entries[0].minLevel = 0;
+            fake.entries[0].maxLevel = 100;
+            fake.entries[0].currentLevel = (uint)(l.count > 0 ? l.level[0].currentLevel : 0);
+            return fake;
+        }
+
         var s = new FanCoolersStatus();
         s.version = (uint)Marshal.SizeOf(typeof(FanCoolersStatus)) | (1u << 16);
         s.reserved = new uint[8];
@@ -303,6 +410,19 @@ internal sealed class NvApi
     /// <summary>Ecrit le niveau de chaque canal. levels[k] = pourcentage.</summary>
     public void ApplyLevels(FanCoolersInfo info, int[] levels, uint mode)
     {
+        if (_legacy)
+        {
+            var l = ReadLegacy();
+            if (l.count > 0)
+            {
+                l.level[0].currentLevel = (short)Math.Max(0, Math.Min(100, levels[0]));
+                l.level[0].currentPolicy = 1; // manuel
+                l.level[0].active = 1;
+                WriteLegacy(l);
+            }
+            return;
+        }
+
         var c = new FanCoolersControl();
         c.version = (uint)Marshal.SizeOf(typeof(FanCoolersControl)) | (1u << 16);
         c.reserved = new uint[8];
@@ -321,6 +441,22 @@ internal sealed class NvApi
 
     public void ApplyAuto(FanCoolersInfo info)
     {
+        if (_legacy)
+        {
+            try
+            {
+                var l = ReadLegacy();
+                if (l.count > 0)
+                {
+                    l.level[0].currentPolicy = 2; // auto
+                    l.level[0].active = 1;
+                    WriteLegacy(l);
+                }
+            }
+            catch { }
+            return;
+        }
+
         var c = new FanCoolersControl();
         c.version = (uint)Marshal.SizeOf(typeof(FanCoolersControl)) | (1u << 16);
         c.reserved = new uint[8];
@@ -610,7 +746,7 @@ internal sealed class FanCurveService : ServiceBase
 
     protected override void OnStart(string[] args)
     {
-        string root = @"C:\ProgramData\NvidiaUndervolt";
+        string root = Paths.Root;
         Directory.CreateDirectory(root);
         _engine = new CurveEngine(root, m => Log(root, m));
         _thread = new Thread(Loop);
@@ -634,7 +770,7 @@ internal sealed class FanCurveService : ServiceBase
         _stop = true;
         if (_thread != null) _thread.Join(5000);
         if (_engine != null) _engine.RestoreAuto();
-        Log(@"C:\ProgramData\NvidiaUndervolt", "Service arrete.");
+        Log(Paths.Root, "Service arrete.");
     }
 
     protected override void OnShutdown()
@@ -644,9 +780,22 @@ internal sealed class FanCurveService : ServiceBase
     }
 }
 
+internal static class Paths
+{
+    public static string Root
+    {
+        get
+        {
+            string a = @"C:\Nvidia";
+            if (File.Exists(Path.Combine(a, "snu.exe"))) return a;
+            return @"C:\ProgramData\NvidiaUndervolt";
+        }
+    }
+}
+
 internal static class Program
 {
-    private const string Root = @"C:\ProgramData\NvidiaUndervolt";
+    private static string Root { get { return Paths.Root; } }
 
     private static void ConsoleLog(string msg)
     {

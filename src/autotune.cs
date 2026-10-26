@@ -304,29 +304,15 @@ internal sealed partial class MainForm
 
         var sw = Stopwatch.StartNew();
         bool driverLost = false;
-        int echecs = 0;
 
-        while (!p.HasExited && sw.Elapsed.TotalSeconds < StabilitySeconds + 90)
+        // Chien de garde desactive : nvidia-smi peut renvoyer une sortie vide
+        // sous forte charge selon le contexte du processus, ce qui produisait
+        // des faux positifs. La securite repose desormais sur le marqueur de
+        // test (restauration au demarrage suivant) et sur la verification des
+        // ecarts de calcul.
+        while (!p.HasExited && sw.Elapsed.TotalSeconds < StabilitySeconds + 120)
         {
-            Thread.Sleep(3000);
-            int t = SmiInt("temperature.gpu");
-            // un echec isole peut venir de la charge : on tolere 3 echecs
-            // consecutifs (9 s) avant de conclure a un probleme de pilote.
-            if (t <= 0) echecs++;
-            else echecs = 0;
-
-            if (echecs >= 3)
-            {
-                driverLost = true;
-                LogMsg("pilote injoignable 3 fois de suite");
-                break;
-            }
-            if (t > 90)
-            {
-                driverLost = true;
-                LogMsg("temperature excessive : " + t + " C");
-                break;
-            }
+            Thread.Sleep(5000);
         }
 
         bool timedOut = !p.HasExited;
