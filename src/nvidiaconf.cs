@@ -275,6 +275,7 @@ internal sealed partial class MainForm : Form
     private Button _btnApply, _btnRestore, _btnPersist;
     private ComboBox _profileBox;
     private WebBrowser _reportView;
+    private TextBox _targetMhzBox;
     private Label _lProfile;
     private volatile bool _busy;
     public static volatile bool ShowRequested;
@@ -519,7 +520,42 @@ internal sealed partial class MainForm : Form
             "Undervolt", "Power limit", "Profil ventilation", "Courbe 831 mV"
         });
 
-        var btnReport = MakeButton("Ouvrir le rapport comparatif", 18, y3 + 6, 260);
+        var lblTarget = new Label
+        {
+            Text = "Frequence cible (MHz) :",
+            ForeColor = Color.Silver,
+            AutoSize = false,
+            Size = new Size(150, 18),
+            Location = new Point(18, y3 + 10)
+        };
+        tConf.Controls.Add(lblTarget);
+
+        _targetMhzBox = new TextBox
+        {
+            Location = new Point(172, y3 + 6),
+            Size = new Size(60, 22),
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.Gainsboro,
+            BorderStyle = BorderStyle.FixedSingle,
+            Text = "0"
+        };
+        tConf.Controls.Add(_targetMhzBox);
+
+        var lblHint = new Label
+        {
+            Text = "(0 = deduite de l'origine)",
+            ForeColor = Color.Gray,
+            AutoSize = false,
+            Size = new Size(160, 18),
+            Location = new Point(238, y3 + 10)
+        };
+        tConf.Controls.Add(lblHint);
+
+        var btnPackage = MakeButton("Determiner le package optimal", 18, y3 + 38, 260);
+        btnPackage.Click += (o, e) => PackageButton();
+        tConf.Controls.Add(btnPackage);
+
+        var btnReport = MakeButton("Ouvrir le rapport comparatif", 18, y3 + 74, 260);
         btnReport.Click += (o, e) => OpenComparativeReport();
         tConf.Controls.Add(btnReport);
 
@@ -1234,28 +1270,36 @@ internal static class Program
         Log("demarrage args=" + string.Join(" ", args));
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false;
-        foreach (string a in args)
+        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false;
+        for (int i = 0; i < args.Length; i++)
         {
+            string a = args[i];
             if (a == "--tray" || a == "/tray") hidden = true;
             if (a == "--autotune") tune = true;
             if (a == "--check") check = true;
             if (a == "--report") report = true;
             if (a == "--freqtest") freqTest = true;
             if (a == "--fantest") fanTest = true;
+            if (a == "--package") packageTest = true;
+            if (a == "--mhz" && i + 1 < args.Length)
+            {
+                int mv;
+                if (int.TryParse(args[i + 1], out mv)) MainForm.RequestedMhz = mv;
+            }
         }
 
         string root = File.Exists(@"C:\Nvidia\snu.exe") ? @"C:\Nvidia" : @"C:\ProgramData\NvidiaUndervolt";
         var compat = Compatibility.Check(root);
         Log("compatibilite : " + (compat.Ok ? "OK" : "NON") + " / " + compat.GpuName);
 
-        if (freqTest || fanTest)
+        if (freqTest || fanTest || packageTest)
         {
             try
             {
                 var f = new MainForm(true, false);
                 if (freqTest) f.CliFrequencyTest();
                 if (fanTest) f.CliFanTest();
+                if (packageTest) f.CliPackage();
             }
             catch (Exception e) { Log("CLI test erreur : " + e.Message); }
             return 0;
