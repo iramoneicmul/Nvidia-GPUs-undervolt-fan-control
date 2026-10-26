@@ -103,6 +103,11 @@ internal static class NvSensors
     private static IntPtr _gpu;
     private static bool _ok;
 
+    // NVAPI n'est pas reentrant : un seul appel a la fois, sinon interblocage
+    // dans nvapi64.dll lorsque l'interface et la mesure interrogent la carte
+    // simultanement.
+    private static readonly object _sync = new object();
+
     public static bool Init()
     {
         if (_ok) return true;
@@ -172,13 +177,21 @@ internal static class NvSensors
     public static void ReadTemps(out int gpu, out int hotspot, out int mem)
     {
         gpu = hotspot = mem = -1;
-        if (!Init()) return;
-        gpu = Sensor(0x01, 0);
-        hotspot = Sensor(0x02, 1);
-        mem = Sensor(0x200, 9);
+        lock (_sync)
+        {
+            if (!Init()) return;
+            gpu = Sensor(0x01, 0);
+            hotspot = Sensor(0x02, 1);
+            mem = Sensor(0x200, 9);
+        }
     }
 
     public static void ReadFans(out int rpm1, out int pct1, out int rpm2, out int pct2)
+    {
+        lock (_sync) { ReadFansCore(out rpm1, out pct1, out rpm2, out pct2); }
+    }
+
+    private static void ReadFansCore(out int rpm1, out int pct1, out int rpm2, out int pct2)
     {
         rpm1 = pct1 = rpm2 = pct2 = -1;
         if (!Init()) return;
@@ -676,7 +689,17 @@ internal sealed partial class MainForm : Form
         var psi = new ProcessStartInfo("powershell.exe",
             "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + command.Replace("\"", "\\\"") + "\"")
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        using (var p = Process.Start(psi)) { p.WaitForExit(60000); }
+        using (var p = Process.Start(psi))
+        {
+            var so = p.StandardOutput.ReadToEndAsync();
+            var se = p.StandardError.ReadToEndAsync();
+            if (!p.WaitForExit(60000))
+            {
+                try { p.Kill(); } catch { }
+                LogMsg("Ps timeout : " + command);
+            }
+            else { so.Wait(2000); se.Wait(2000); }
+        }
     }
 
     private void ApplyConfig()
@@ -712,7 +735,7 @@ internal sealed partial class MainForm : Form
     {
         if (MessageBox.Show(
             "Restaurer la configuration d'origine ?\n\n" +
-            "- courbe V/F stock\n- power limit 350 W\n- ventilateurs rendus au VBIOS\n" +
+            "- courbe V/F stock\n- power limit d'origine (" + PlDefault + " W)\n- ventilateurs rendus au VBIOS\n" +
             "- service et tache planifiee supprimes",
             "Restauration", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
             return;
@@ -723,7 +746,7 @@ internal sealed partial class MainForm : Form
             "Suppression du service",
             "Ventilateurs rendus au VBIOS",
             "Courbe V/F remise au stock",
-            "Power limit remis a 350 W",
+            "Power limit remis a " + PlDefault + " W",
             "Suppression de la tache planifiee",
             "Verification"
         }, i =>
@@ -734,7 +757,7 @@ internal sealed partial class MainForm : Form
                 case 1: Ps("& sc.exe delete NvidiaFanCurve | Out-Null"); break;
                 case 2: Ps("& '" + Path.Combine(Root, "nvfan.exe") + "' auto | Out-Null"); break;
                 case 3: Ps("& '" + Path.Combine(Root, "snu.exe") + "' clear | Out-Null"); break;
-                case 4: Ps("& nvidia-smi -pl 350 | Out-Null"); break;
+                case 4: Ps("& nvidia-smi -pl " + PlDefault + " | Out-Null"); break;
                 case 5: Ps("Unregister-ScheduledTask -TaskName NvidiaUndervolt -Confirm:$false -ErrorAction SilentlyContinue"); break;
                 case 6:
                     Ps("& '" + Path.Combine(Root, "snu.exe") + "' status | Out-Null");
@@ -1361,7 +1384,7 @@ internal static class Program
             {
                 Process.Start(new ProcessStartInfo(Path.Combine(root, "snu.exe"), "clear")
                 { UseShellExecute = false, CreateNoWindow = true }).WaitForExit(15000);
-                Process.Start(new ProcessStartInfo("nvidia-smi", "-pl 350")
+                Process.Start(new ProcessStartInfo("nvidia-smi", "-pl " + MainForm.DefaultPowerLimit)
                 { UseShellExecute = false, CreateNoWindow = true }).WaitForExit(15000);
             }
             catch { }

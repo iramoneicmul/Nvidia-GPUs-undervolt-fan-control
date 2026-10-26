@@ -204,3 +204,85 @@ Vérification rapide :
 ```powershell
 (Get-Item C:\Nvidia\nvidiaconf.exe).VersionInfo.FileVersion
 ```
+
+---
+
+## 10. Règles d'optimisation (v1.0.39)
+
+### 10.1 Power limit
+
+| Règle | Valeur |
+|---|---|
+| Marge de sécurité | **+10 W** au-dessus de la consommation réelle en jeu |
+| Arrondi | pas de **10 W** supérieur (309 W → 320 W) |
+| Plafond | **valeur d'origine du VBIOS**, lue à l'exécution |
+| Plancher | `power.min_limit` de la carte |
+
+Le plafond n'est **pas** codé en dur. Les limites sont relevées au démarrage :
+
+```powershell
+nvidia-smi --query-gpu=power.min_limit,power.max_limit,power.default_limit --format=csv,noheader,nounits
+```
+
+Sur la RTX 3080 Ti FE : `100..400 W, défaut 350 W`. Sur une autre carte, les
+valeurs sont différentes et l'outil s'y adapte automatiquement.
+
+Le calcul se fait en deux temps : une mesure courte donne un PL provisoire,
+puis la **mesure finale** (plus longue) recale le PL (+10 W). Cela évite de
+retenir un PL trop généreux à cause du bruit d'une mesure courte.
+
+### 10.2 Tension
+
+- La recherche part de 843 mV et descend par paliers de 6,25 mV.
+- Durée par palier : **600 s** avec `stability.py` en 8192×8192 (PyTorch).
+- Marge retenue : **3 %** au-dessus du dernier palier stable, soit ~4 pas.
+- **Arrondi obligatoire au palier supérieur** : la courbe NVAPI n'accepte que
+  des paliers de 6,25 mV ; demander 830 mV appliquait 826 mV (erreur corrigée
+  en v1.0.38).
+
+### 10.3 Fréquence et ventilation
+
+- Fréquence cible : moyenne mesurée sur la charge « jeu » à l'origine, arrondie
+  à 15 MHz.
+- Ventilation : profil `equilibre` (consigne en tr/min), retour au VBIOS sous
+  46 °C avec hystérésis de 4 °C.
+
+### 10.4 Pourquoi 3 % de marge sur la tension
+
+Le test manuel de référence (28 187 itérations sur 15 min) n'avait révélé que
+**2 écarts** à 818 mV. Un test automatisé de 10 min (~2 400 itérations) ne peut
+pas détecter une anomalie aussi rare : il déclarait 806 mV « stable ». La marge
+de 3 % compense cette limite statistique et ramène la consigne autour de
+831 mV, valeur validée manuellement.
+
+---
+
+## 11. Historique des corrections (v1.0.31 → v1.0.39)
+
+| Version | Correction |
+|---|---|
+| 1.0.31 | Test « package » exécuté par l'instance en cours (`NvidiaConf.Package`) |
+| 1.0.32 | Contrôle du moteur (PyTorch + `stability.py`) et journal par palier |
+| 1.0.33 | `RunCapture()` : lecture asynchrone bornée, fin des `ReadToEnd()` bloquants |
+| 1.0.34 | **Blocage résolu** : verrou NVAPI, timer UI suspendu, mesure en thread borné |
+| 1.0.35 | Test de stabilité renforcé (8192×8192, 600 s par palier) |
+| 1.0.36 | Marge du power limit : +10 W au lieu de +10 % |
+| 1.0.37 | Limites de puissance lues sur la carte (fin du 350 W codé en dur) |
+| 1.0.38 | Tension arrondie au palier NVAPI supérieur |
+| 1.0.39 | Power limit recalculé sur la mesure finale |
+
+### Cause racine du blocage (v1.0.34)
+
+Trois défauts cumulés :
+
+1. `p.StandardOutput.ReadToEnd()` était appelé **avant** `WaitForExit()`, sans
+   délai : sous charge, `nvidia-smi` pouvait ne pas rendre la main et bloquer le
+   thread indéfiniment.
+2. **NVAPI était appelé simultanément** par le rafraîchissement de l'interface
+   (timer de 2 s) et par la mesure. `nvapi64.dll` n'est pas réentrant : cela
+   provoquait un interblocage.
+3. Aucune borne globale : la mesure pouvait bloquer sans jamais rendre la main.
+
+Corrections : verrou unique `NvSensors._sync`, timer de l'interface suspendu
+pendant le test, échantillonnage dans un thread avec `Join` borné, et
+journalisation de chaque échantillon (`echantillon N : ... MHz / ... W`).

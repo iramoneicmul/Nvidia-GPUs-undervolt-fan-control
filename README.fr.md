@@ -224,21 +224,30 @@ powershell -File C:\ProgramData\NvidiaUndervolt\apply-undervolt.ps1
 `nvidiaconf.exe` embarque tout le protocole de réglage.
 
 ```powershell
-C:\Nvidia\nvidiaconf.exe --autotune     # ou le bouton dans la fenêtre
+C:\Nvidia\nvidiaconf.exe --package    # analyse complète (ligne de base + tension + power limit)
+C:\Nvidia\nvidiaconf.exe --autotune   # recherche de tension seule
 ```
 
-1. Lit la **vraie** table de tension dans `courbe-stock.json` (aucune valeur inventée).
-2. Pour chaque palier, de 843 mV vers le bas : écrit une courbe plateau,
-   l'applique par NVAPI, puis lance un test de stabilité de **240 s** avec
-   vérification bit à bit des résultats.
-3. S'arrête au premier palier instable.
-4. **Marge de sécurité** : conserve le palier *au-dessus* du dernier stable.
-5. Écrit `plateau-active.json` et un rapport Markdown horodaté.
-6. Applique le power limit.
+**Analyse complète (`--package`)**
 
-Une barre de progression et un libellé d'étape indiquent en permanence ce qui
-est en cours ; chaque étape est aussi journalisée. La fréquence cible se règle
-dans `autotune.ini` (`target_mhz`, pas matériel de 15 MHz).
+1. Mesure une ligne de base à 4 niveaux de charge (légère, jeu, soutenue,
+   lourde) sur la configuration d'origine, avec **PyTorch obligatoire**
+   (vérification bit à bit des résultats).
+2. Déduit la fréquence cible de la mesure en jeu (pas de 15 MHz).
+3. Cherche la tension de 843 mV vers le bas, **600 s par palier** sur des
+   matrices 8192×8192 ; s'arrête au premier palier instable.
+4. **Marge de tension : 3 %** au-dessus du dernier palier stable, arrondie
+   **au palier supérieur** (6,25 mV) — la courbe n'accepte que ces paliers.
+5. **Power limit : consommation mesurée en jeu + 10 W**, arrondie au pas de
+   10 W supérieur (309 W → 320 W), plafonnée à `power.default_limit` de la
+   carte. La limite est **lue sur le GPU** à l'exécution, jamais codée en dur,
+   et recalculée sur la mesure finale.
+6. Applique le profil de ventilation `equilibre`, remesure les 4 niveaux et
+   écrit un rapport Markdown horodaté.
+
+Le test s'exécute dans l'instance déjà en cours : l'icône reste disponible et
+la barre de progression s'affiche dans sa fenêtre. Chaque mesure est
+journalisée (`echantillon N : ... MHz / ... W / ... mV`).
 
 ---
 
@@ -372,8 +381,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-df30ebad1af5da0b207fa222f858004c51bb8300a741d72fa406ed0e45ce9a70  nvidiaconf.exe
-ae84efdb760ffcb29e2b4c551aaa303c54db3a2fbf24b9845f28c0fd0708b5c3  nvidiaconf.msi
+6862b3c1a6317ca00d82da80b65383d422a72995a56ae915300b728be14af56f  nvidiaconf.exe
+934cdc4bccca44f9a672a3df5b682ea0da49ce81fad3b2f8f63f995d6d902460  nvidiaconf.msi
 ```
 
 ### Premier lancement

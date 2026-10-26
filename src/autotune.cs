@@ -22,7 +22,7 @@ using System.Windows.Forms;
 internal sealed partial class MainForm
 {
     private int TargetMhz = 1845;
-    private const int StabilitySeconds = 240;
+    private const int StabilitySeconds = 600;
 
     private bool _autoTuneRequested;
 
@@ -335,7 +335,7 @@ internal sealed partial class MainForm
         try
         {
             Ps("& '" + Path.Combine(Root, "snu.exe") + "' clear | Out-Null");
-            Ps("& nvidia-smi -pl 350 | Out-Null");
+            Ps("& nvidia-smi -pl " + PlDefault + " | Out-Null");
             Ps("& '" + Path.Combine(Root, "nvfan.exe") + "' auto | Out-Null");
             LogMsg("restauration d'urgence effectuee (stock, 350 W, ventilateurs VBIOS)");
         }

@@ -77,7 +77,7 @@ internal sealed partial class MainForm
 
         // --- 2) configuration d'origine ---
         Ps("& '" + Path.Combine(Root, "snu.exe") + "' clear | Out-Null");
-        Ps("& nvidia-smi -pl 350 | Out-Null");
+        Ps("& nvidia-smi -pl " + PlDefault + " | Out-Null");
 
         for (int i = 0; i < Levels.Length; i++)
         {
@@ -187,6 +187,45 @@ internal sealed partial class MainForm
         }
         catch (Exception ex) { LogMsg("RunCapture " + ex.Message); return ""; }
     }
+
+    // ------------------------------------------------------------------
+    //  Limites de puissance de la carte (aucune valeur codee en dur)
+    // ------------------------------------------------------------------
+    private static bool _plRead;
+    private static int _plMin = 100, _plMax = 350, _plDef = 350;
+
+    private static void ReadPowerLimits()
+    {
+        if (_plRead) return;
+        _plRead = true;
+        try
+        {
+            string o = RunCapture(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
+                "--query-gpu=power.min_limit,power.max_limit,power.default_limit --format=csv,noheader,nounits", 8000);
+            var parts = o.Trim().Split(',');
+            double a, b, c;
+            if (parts.Length >= 3 &&
+                double.TryParse(parts[0].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out a) &&
+                double.TryParse(parts[1].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out b) &&
+                double.TryParse(parts[2].Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out c))
+            {
+                _plMin = (int)Math.Ceiling(a);
+                _plMax = (int)Math.Floor(b);
+                _plDef = (int)Math.Floor(c);
+            }
+        }
+        catch { }
+        if (_plDef <= 0) _plDef = _plMax > 0 ? _plMax : 350;
+        if (_plMax <= 0) _plMax = _plDef;
+        if (_plMin <= 0) _plMin = 100;
+        LogMsg(string.Format("limites carte : power limit {0}..{1} W (defaut {2} W)", _plMin, _plMax, _plDef));
+    }
+
+    // Valeur d'origine du VBIOS : sert de plafond et de valeur de restauration.
+    internal static int DefaultPowerLimit { get { ReadPowerLimits(); return _plDef; } }
+    private static int PlDefault { get { ReadPowerLimits(); return _plDef; } }
+    private static int PlMax { get { ReadPowerLimits(); return _plMax; } }
+    private static int PlMin { get { ReadPowerLimits(); return _plMin; } }
 
     private static int SmiInt(string field)
     {

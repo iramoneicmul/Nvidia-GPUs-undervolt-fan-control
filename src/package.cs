@@ -66,6 +66,9 @@ internal sealed partial class MainForm
         if (_targetMhzBox != null) int.TryParse(_targetMhzBox.Text.Trim(), out requested);
         MainForm.RequestedMhz = requested;
         _busy = true;
+        // suspendre le rafraichissement de l'interface : ses appels NVAPI
+        // concurrents provoquaient un interblocage avec ceux de la mesure.
+        if (_timer != null) _timer.Stop();
         _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
         _bar.Value = 0;
         _step.Text = "Preparation du package optimal...";
@@ -78,6 +81,7 @@ internal sealed partial class MainForm
             {
                 Ui(() =>
                 {
+                    if (_timer != null) _timer.Start();
                     _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = true;
                     _busy = false;
                 });
@@ -108,7 +112,7 @@ internal sealed partial class MainForm
         // ---------- 1) ligne de base d'origine ----------
         Ui(() => { _step.Text = "Ligne de base : configuration d'origine (4 charges)"; _bar.Value = 2; });
         Ps("& '" + Path.Combine(Root, "snu.exe") + "' clear | Out-Null");
-        Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl 350 | Out-Null");
+        Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + PlDefault + " | Out-Null");
         Thread.Sleep(3000);
 
         for (int i = 0; i < Levels.Length; i++)
@@ -196,27 +200,44 @@ internal sealed partial class MainForm
         int mvRetained = lastOk;
         int okIndex = cands.IndexOf(lastOk);
         if (okIndex > 0) mvRetained = cands[okIndex - 1];
+
+        // Marge de securite sur la tension. Un test court ne peut pas detecter
+        // une instabilite tres rare (2 ecarts sur 28 000 iterations mesurees
+        // manuellement) : on applique donc 3 % de marge, soit ~4 pas de 6,25 mV.
+        int margin = (int)Math.Ceiling(lastOk * 0.03 / 6.25) * 6;
+        int safe = lastOk + Math.Max(6, margin);
+        int hi = 0;
+        foreach (int c in cands) if (c > hi) hi = c;
+        if (safe > hi) safe = hi;
+
+        // La courbe n'accepte que des paliers de 6,25 mV : on arrondit au
+        // palier superieur ou egal, jamais en dessous de la marge.
+        int rounded = hi;
+        foreach (int c in cands) if (c >= safe && c < rounded) rounded = c;
+        if (rounded > mvRetained) mvRetained = rounded;
+        LogMsg(string.Format("package : derniere tension stable {0} mV -> marge 3 % -> {1} mV", lastOk, mvRetained));
         ClearMarker();
         LogMsg("package : tension retenue " + mvRetained + " mV");
 
         // application provisoire pour determiner le power limit
         WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-active.json"));
         ApplyTuning(Path.Combine(Root, "plateau-active.json"));
-        Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl 350 | Out-Null");
+        Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + PlDefault + " | Out-Null");
         Thread.Sleep(3000);
 
         // ---------- 4) power limit ----------
         Ui(() => { _step.Text = "Determination du power limit..."; _bar.Value = 80; });
         var jeu = MeasureDetailed(py, 2048, 45);
 
-        // Marge de securite : 10 % au-dessus de la consommation reelle, afin de
-        // ne jamais bridler en usage reel (les charges varient), sans jamais
-        // depasser la valeur d'origine du VBIOS (350 W).
-        int pl = (int)(Math.Ceiling(jeu.Watts * 1.10 / 10.0) * 10);
-        int plOrigin = 350;
+        // Marge de securite : +10 W au-dessus de la consommation reelle en jeu,
+        // arrondie au pas de 10 W. Exemple valide : 309 W -> 320 W.
+        // Plafond : valeur d'origine du VBIOS, lue sur la carte (pas de valeur
+        // codee en dur : chaque modele a ses propres limites).
+        int pl = (int)(Math.Ceiling((jeu.Watts + 10) / 10.0) * 10);
+        int plOrigin = PlDefault;
         if (pl < 300) pl = 300;
         if (pl > plOrigin) pl = plOrigin;
-        LogMsg(string.Format("package : conso jeu {0:0.0} W, marge 10% -> {1} W (plafond {2} W)",
+        LogMsg(string.Format("package : conso jeu {0:0.0} W, marge +10 W -> {1} W (plafond carte {2} W)",
             jeu.Watts, pl, plOrigin));
         Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + pl + " | Out-Null");
         LogMsg("package : consommation en jeu " + jeu.Watts.ToString("0.0") + " W -> power limit " + pl + " W");
@@ -233,6 +254,22 @@ internal sealed partial class MainForm
             LogMsg("package optimise " + LevelNames[i] + " : " + opti[LevelNames[i]].Line());
         }
 
+        // Le power limit provisoire vient d'une mesure courte ; on le recale sur
+        // la consommation relevee pendant la mesure finale (plus longue) +10 W.
+        if (opti.ContainsKey("jeu"))
+        {
+            int plFinal = (int)(Math.Ceiling((opti["jeu"].Watts + 10) / 10.0) * 10);
+            if (plFinal < PlMin) plFinal = PlMin;
+            if (plFinal > plOrigin) plFinal = plOrigin;
+            if (plFinal != pl)
+            {
+                Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + plFinal + " | Out-Null");
+                LogMsg("package : power limit recale sur la mesure finale " +
+                       opti["jeu"].Watts.ToString("0.0") + " W -> " + plFinal + " W");
+                pl = plFinal;
+            }
+        }
+
         // ---------- 6) rapport ----------
         WritePackageReport(stock, opti, target, mvRetained, pl, rows, firstFail);
         Ui(() => { _bar.Value = 100; _step.Text = "Package optimal applique et verifie."; });
@@ -243,6 +280,7 @@ internal sealed partial class MainForm
     {
         var m = new Measure();
         Thread load = null;
+        Process loadProc = null;
 
         if (py != null)
         {
@@ -252,7 +290,11 @@ internal sealed partial class MainForm
                 {
                     var psi = new ProcessStartInfo(py, "\"C:\\Nvidia\\stress-long.py\" " + seconds + " " + size)
                     { UseShellExecute = false, CreateNoWindow = true };
-                    using (var p = Process.Start(psi)) p.WaitForExit((seconds + 20) * 1000);
+                    using (var p = Process.Start(psi))
+                    {
+                        loadProc = p;
+                        p.WaitForExit((seconds + 20) * 1000);
+                    }
                 }
                 catch { }
             });
@@ -273,35 +315,71 @@ internal sealed partial class MainForm
         long sumMhz = 0, sumMv = 0, sumRpm = 0, n = 0;
         double sumW = 0;
         int maxGpu = 0, maxMem = 0;
-        var sw = Stopwatch.StartNew();
-        int sampleWindow = Math.Max(15, seconds / 2) * 1000;
+        string lastStep = "demarrage";
+        object stateLock = new object();
 
-        while (sw.ElapsedMilliseconds < sampleWindow)
+        var sampler = new Thread(() =>
         {
-            int mhz = SmiInt("clocks.gr");
-            if (mhz > 0) { sumMhz += mhz; n++; }
-            sumW += SmiDouble("power.draw");
-            sumRpm += SmiInt("fan.speed");
+            var sw = Stopwatch.StartNew();
+            int sampleWindow = Math.Max(15, seconds / 2) * 1000;
+            int k = 0;
+            while (sw.ElapsedMilliseconds < sampleWindow)
+            {
+                k++;
+                lastStep = "clocks.gr";
+                int mhz = SmiInt("clocks.gr");
+                lastStep = "power.draw";
+                double w = SmiDouble("power.draw");
+                lastStep = "fan.speed";
+                int rpm = SmiInt("fan.speed");
+                lastStep = "nvapi temperatures";
+                int g, h, mm;
+                NvSensors.ReadTemps(out g, out h, out mm);
+                lastStep = "snu voltage";
+                int mv = ReadVoltage();
+                lastStep = "attente";
 
-            int g, h, mm;
-            NvSensors.ReadTemps(out g, out h, out mm);
-            if (g > maxGpu) maxGpu = g;
-            if (mm > maxMem) maxMem = mm;
+                lock (stateLock)
+                {
+                    if (mhz > 0) { sumMhz += mhz; n++; }
+                    sumW += w;
+                    sumRpm += rpm;
+                    sumMv += mv;
+                    if (g > maxGpu) maxGpu = g;
+                    if (mm > maxMem) maxMem = mm;
+                }
+                LogMsg(string.Format("  echantillon {0} : {1} MHz / {2:0.0} W / {3} mV / {4} C",
+                    k, mhz, w, mv, g));
+                Thread.Sleep(1000);
+            }
+        });
+        sampler.IsBackground = true;
+        sampler.Start();
 
-            sumMv += ReadVoltage();
-            Thread.Sleep(1000);
+        // attente bornee : meme si un appel externe ne rend pas la main, le
+        // package poursuit avec les mesures deja collectees.
+        int budget = (seconds + 90) * 1000;
+        if (!sampler.Join(budget))
+        {
+            LogMsg("mesure : echantillonnage bloque a l'etape '" + lastStep +
+                   "' apres " + (budget / 1000) + " s - poursuite sans attendre");
         }
 
+        try { if (loadProc != null && !loadProc.HasExited) loadProc.Kill(); } catch { }
+
+        lock (stateLock)
+        {
+            if (n > 0)
+            {
+                m.Mhz = (int)(sumMhz / n);
+                m.Rpm = (int)(sumRpm / n);
+                m.TempGpu = maxGpu;
+                m.TempMem = maxMem;
+                m.Watts = sumW / n;
+                m.Mv = (int)(sumMv / n);
+            }
+        }
         LogMsg("mesure : charge " + size + " terminee, " + n + " echantillons");
-        if (n > 0)
-        {
-            m.Mhz = (int)(sumMhz / n);
-            m.Rpm = (int)(sumRpm / n);
-            m.TempGpu = maxGpu;
-            m.TempMem = maxMem;
-            m.Watts = sumW / n;
-            m.Mv = (int)(sumMv / n);
-        }
         return m;
     }
 
@@ -348,6 +426,7 @@ internal sealed partial class MainForm
     }
 
     // ------------------------------------------------------------------
+    // ------------------------------------------------------------------
     private void WritePackageReport(Dictionary<string, Measure> stock, Dictionary<string, Measure> opti,
                                     int target, int mv, int pl, List<string> rows, int firstFail)
     {
@@ -376,7 +455,8 @@ internal sealed partial class MainForm
             var b = opti.ContainsKey(lvl) ? opti[lvl] : null;
             if (a == null || b == null) continue;
             sb.AppendLine(string.Format("| {0} | {1} | {2} | {3:+0;-0;0} | {4:+0.0;-0.0;0.0} | {5:+0;-0;0} |",
-                Cap(lvl), a.Line(), b.Line(), b.Mhz - a.Mhz, b.Watts - a.Watts, b.TempGpu - a.TempGpu));
+                Cap(lvl), a.Line().Replace("|", " · "), b.Line().Replace("|", " · "),
+                b.Mhz - a.Mhz, b.Watts - a.Watts, b.TempGpu - a.TempGpu));
         }
 
         sb.AppendLine();

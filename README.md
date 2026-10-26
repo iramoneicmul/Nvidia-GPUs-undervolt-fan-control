@@ -217,20 +217,29 @@ powershell -File C:\ProgramData\NvidiaUndervolt\apply-undervolt.ps1
 `nvidiaconf.exe` embeds the whole tuning protocol.
 
 ```powershell
-C:\Nvidia\nvidiaconf.exe --autotune     # or the button in the window
+C:\Nvidia\nvidiaconf.exe --package    # full analysis (baseline + voltage + power limit)
+C:\Nvidia\nvidiaconf.exe --autotune   # voltage search only
 ```
 
-1. Reads the **real** voltage table from `courbe-stock.json` (no invented values).
-2. For each tier, from 843 mV downward: writes a plateau curve, applies it via
-   NVAPI, then runs a **240 s** stability test with bit-exact result checking.
-3. Stops at the first unstable tier.
-4. **Safety margin**: keeps the tier *above* the last stable one.
-5. Writes `plateau-active.json` and a timestamped Markdown report.
-6. Applies the power limit.
+**Full analysis (`--package`)**
 
-A progress bar and a step label show what is running at all times; every step
-is also logged. The target frequency is read from `autotune.ini`
-(`target_mhz`, 15 MHz hardware step).
+1. Measures a 4-level baseline (light, gaming, sustained, heavy) on the stock
+   configuration, with PyTorch (bit-exact result checking, mandatory).
+2. Derives the target frequency from the gaming measurement (15 MHz step).
+3. Searches voltage from 843 mV downward, **600 s per tier** on 8192x8192
+   matrices; stops at the first unstable tier.
+4. **Voltage margin: 3 %** above the last stable tier, rounded **up** to the
+   next NVAPI step (6.25 mV) - the curve only accepts those steps.
+5. **Power limit: measured gaming draw + 10 W**, rounded to the next 10 W
+   (309 W -> 320 W), capped at the card's `power.default_limit`. The limit is
+   read from the GPU at runtime, never hardcoded, and recomputed from the
+   final measurement.
+6. Applies the `equilibre` fan profile, re-measures the 4 levels and writes a
+   timestamped Markdown report.
+
+The test runs inside the already-running instance: the tray icon stays
+available and the progress bar is shown in its window. Every measurement is
+logged (`echantillon N : ... MHz / ... W / ... mV`).
 
 ---
 
@@ -361,8 +370,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-df30ebad1af5da0b207fa222f858004c51bb8300a741d72fa406ed0e45ce9a70  nvidiaconf.exe
-ae84efdb760ffcb29e2b4c551aaa303c54db3a2fbf24b9845f28c0fd0708b5c3  nvidiaconf.msi
+6862b3c1a6317ca00d82da80b65383d422a72995a56ae915300b728be14af56f  nvidiaconf.exe
+934cdc4bccca44f9a672a3df5b682ea0da49ce81fad3b2f8f63f995d6d902460  nvidiaconf.msi
 ```
 
 ### First run
