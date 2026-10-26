@@ -40,6 +40,7 @@ files = [
     ("setup-choice.ps1", "SetupChoice"),
     ("install-conf-task.ps1", "ConfTask"),
     ("remove-conf-task.ps1", "RemoveConfTask"),
+    ("restore-stock.ps1", "RestoreStockScript"),
     ("autotune.ini", "AutoTuneIni"),
 ]
 
