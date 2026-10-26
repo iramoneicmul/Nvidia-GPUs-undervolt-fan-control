@@ -539,3 +539,75 @@ Commande directe équivalente :
 ```powershell
 python C:\Nvidia\unlock-bench.py 8192 C:\Nvidia\unlock-bench.txt
 ```
+
+### 14.6 Activation réelle (v1.5.0 → 1.5.2)
+
+L'onglet ne se contente plus d'expliquer : il **pilote le chargeur UEFI** du
+port Windows lorsque celui-ci est présent.
+
+| Action | Commande exécutée |
+|---|---|
+| Activer | `powershell -File <port>\internal-boot\Headless.ps1 -EnableAutomatic -ConfirmedSuccess` |
+| Désactiver | `powershell -File <port>\internal-boot\Headless.ps1 -RestoreWindowsFirst` |
+| Vérifier | `Confirm-SecureBootUEFI`, `Get-BitLockerVolume C:`, `bcdedit /enum firmware` |
+| Choisir le port | `FolderBrowserDialog`, chemin mémorisé dans `gpu-unlock.txt` |
+
+**Garde-fous** : confirmation explicite avant toute modification de
+l'amorçage, refus si Secure Boot est actif, refus si `Headless.ps1` est absent,
+message indiquant les profils validés et le statut de la carte installée.
+
+**Cycle d'état** :
+
+```
+desactive --(Activer)--> ACTIVE (attente redemarrage) --(reboot + Mesurer)--> verdict
+```
+
+Le verdict compare le débit mesuré à la **référence verrouillée** :
+
+| Gain FP16 | Verdict affiché |
+|---|---|
+| > 50 % | « déblocage détecté » |
+| 10 – 50 % | « gain partiel, à confirmer » |
+| < 10 % | « pas de déblocage détecté » |
+
+### 14.7 Fichier d'état
+
+`C:\Nvidia\gpu-unlock.txt` :
+
+```
+enabled=0
+pending=0
+port=C:\Nvidia\gpu-unlock
+last=
+ref_fp16=71.51
+ref_bf16=73.11
+ref_tf32=36.65
+last_fp16=0.00
+last_bf16=0.00
+last_tf32=0.00
+```
+
+### 14.8 Ligne de commande
+
+```powershell
+C:\Nvidia\nvidiaconf.exe --unlock-status
+C:\Nvidia\nvidiaconf.exe --unlock-bench --reference
+C:\Nvidia\nvidiaconf.exe --unlock-bench
+```
+
+`--unlock-status` journalise les cinq contrôles de prérequis ; `--unlock-bench`
+mesure et enregistre soit la référence, soit la mesure courante.
+
+### 14.9 État constaté sur Hellfire (26/10/2026)
+
+```
+[OK]   Secure Boot         : desactive
+[OK]   BitLocker C:        : Off
+[----] Port Windows        : absent (C:\Nvidia\gpu-unlock)
+[OK]   Entree de demarrage : absente
+[OK]   Architecture        : GA102/GA104
+prerequis : manquants
+```
+
+L'activation reste donc bloquée à l'étape « chargeur absent », ce qui est le
+comportement attendu tant que le port UEFI n'est pas compilé et déposé.

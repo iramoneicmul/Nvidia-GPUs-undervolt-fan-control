@@ -91,8 +91,13 @@ The tab therefore reports the real situation and **measures the potential**:
 
 The Windows port (`impacifist/Windows-GPU-UNLOCK`) is an experimental UEFI
 loader, validated on RTX 3060 / 3070 Ti / 3090 FE / 3090 Ti — **not on
-RTX 3080 Ti**. The enable/disable buttons explain this and link to both
-projects instead of pretending to activate something.
+RTX 3080 Ti**. **Enable/disable is real**: when the Windows UEFI loader is present in
+`C:\Nvidia\gpu-unlock`, the tab drives the boot entry
+(`Headless.ps1 -EnableAutomatic -ConfirmedSuccess` / `-RestoreWindowsFirst`),
+after checking Secure Boot, BitLocker, loader presence and boot entry, with an
+explicit confirmation. The folder can be changed from the tab. After a reboot,
+a benchmark compared with the locked reference tells whether the unlock is
+actually active (> 50 % FP16 gain).
 
 Two caveats: the **power limit remains the limiting factor** (at 320 W the card
 runs out of power before issue rate), and **games gain nothing** (FP32 is not
@@ -452,8 +457,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-0e4e4730875792ebe2d8d4bca28e81b4f0db25dc0732e3ba939d86c41903a847  nvidiaconf.exe
-66063ceb736754c8dc2c7995f1287677b3b349690215b90279e1e160d33ed08c  nvidiaconf.msi
+7b5cea6777211cf49646a8a9915154df1f2c352040dbaed85f1fd6e2c7d971b2  nvidiaconf.exe
+8ea7a0680b8a76b7ecb0baff44d2783535d398ec49f6fd27bf826e3750b620b0  nvidiaconf.msi
 ```
 
 ### First run

@@ -94,8 +94,13 @@ L'onglet expose donc la situation réelle et **mesure le potentiel** :
 
 Le port Windows (`impacifist/Windows-GPU-UNLOCK`) est un chargeur UEFI
 expérimental, validé sur RTX 3060 / 3070 Ti / 3090 FE / 3090 Ti — **pas sur
-RTX 3080 Ti**. Les boutons Activer/Désactiver expliquent cette situation et
-renvoient vers les deux projets, au lieu de simuler une activation.
+RTX 3080 Ti**. **L'activation est réelle** : quand le chargeur UEFI Windows est présent dans
+`C:\Nvidia\gpu-unlock`, l'onglet pilote l'entrée de démarrage
+(`Headless.ps1 -EnableAutomatic -ConfirmedSuccess` / `-RestoreWindowsFirst`),
+après vérification de Secure Boot, BitLocker, de la présence du chargeur et de
+l'entrée de démarrage, avec confirmation explicite. Le dossier est modifiable
+depuis l'onglet. Après redémarrage, un benchmark comparé à la référence
+verrouillée indique si le déblocage est réellement actif (gain FP16 > 50 %).
 
 Deux réserves : le **power limit reste le facteur limitant** (à 320 W la carte
 sature en énergie avant l'issue rate), et **les jeux ne gagnent rien** (le FP32
@@ -466,8 +471,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-0e4e4730875792ebe2d8d4bca28e81b4f0db25dc0732e3ba939d86c41903a847  nvidiaconf.exe
-66063ceb736754c8dc2c7995f1287677b3b349690215b90279e1e160d33ed08c  nvidiaconf.msi
+7b5cea6777211cf49646a8a9915154df1f2c352040dbaed85f1fd6e2c7d971b2  nvidiaconf.exe
+8ea7a0680b8a76b7ecb0baff44d2783535d398ec49f6fd27bf826e3750b620b0  nvidiaconf.msi
 ```
 
 ### Premier lancement

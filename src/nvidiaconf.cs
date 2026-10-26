@@ -726,6 +726,9 @@ internal sealed partial class MainForm : Form
     {
         try
         {
+            // .NET Framework ancien : TLS 1.2 doit etre demande explicitement.
+            try { ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; } catch { }
+
             var req = (HttpWebRequest)WebRequest.Create(
                 "https://api.github.com/repos/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest");
             req.UserAgent = "nvidiaconf";
@@ -1434,7 +1437,7 @@ internal static class Program
         Log("demarrage args=" + string.Join(" ", args));
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false;
+        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false, unlockStatus = false, unlockBench = false, unlockRef = false;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i];
@@ -1446,6 +1449,9 @@ internal static class Program
             if (a == "--fantest") fanTest = true;
             if (a == "--package") packageTest = true;
             if (a == "--compare") compareTest = true;
+            if (a == "--unlock-status") unlockStatus = true;
+            if (a == "--unlock-bench") { unlockBench = true; }
+            if (a == "--reference") unlockRef = true;
             if (a == "--mhz" && i + 1 < args.Length)
             {
                 int v;
@@ -1476,6 +1482,18 @@ internal static class Program
                 if (fanTest) f.CliFanTest();
             }
             catch (Exception e) { Log("CLI test erreur : " + e.Message); }
+            return 0;
+        }
+
+        if (unlockStatus || unlockBench)
+        {
+            try
+            {
+                var uf = new MainForm(true, false);
+                if (unlockStatus) uf.CliUnlockStatus();
+                if (unlockBench) uf.CliUnlockBench(unlockRef);
+            }
+            catch (Exception e) { Log("unlock CLI " + e.Message); }
             return 0;
         }
 
