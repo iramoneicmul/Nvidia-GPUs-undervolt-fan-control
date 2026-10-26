@@ -468,10 +468,6 @@ internal sealed partial class MainForm : Form
         _btnPersist.Click += (o, e) => InstallPersistence();
         bottom.Controls.Add(_btnPersist);
 
-        var btnLang = MakeButton("Langue", 548, 80, 60);
-        btnLang.Click += (o, e) => ChooseLanguage(btnLang);
-        bottom.Controls.Add(btnLang);
-
         var btnTune = MakeButton("Trouver la configuration optimale", 16, 114, 340);
         btnTune.Click += (o, e) => AutoTune();
         bottom.Controls.Add(btnTune);
@@ -524,6 +520,21 @@ internal sealed partial class MainForm : Form
         {
             "Bus PCIe (version)", "Bus PCIe (largeur)"
         });
+
+        int yLang = y1 + 70;
+        var lblLang = new Label
+        {
+            Text = Lang.T("Langue") + " : " + Lang.Names[Lang.IndexOf(Lang.Current)],
+            ForeColor = Color.Silver,
+            AutoSize = false,
+            Size = new Size(320, 18),
+            Location = new Point(18, yLang)
+        };
+        tIdent.Controls.Add(lblLang);
+
+        var btnLang = MakeButton("Langue", 18, yLang + 24, 140);
+        btnLang.Click += (o, e) => ChooseLanguage(btnLang);
+        tIdent.Controls.Add(btnLang);
 
         int y2 = 8;
         y2 = Section(tFreq, "Limites d'origine", y2, new[]

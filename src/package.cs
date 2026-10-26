@@ -584,7 +584,7 @@ internal sealed partial class MainForm
             Func<int, int, bool> tryFrequency = (mhz, step) =>
             {
                 UiProgress(string.Format("Frequence {0} MHz a {1} mV", mhz, mvRetained),
-                    70 + step * 2, Math.Max(1, (5 - step) * 4));
+                    70 + Math.Min(step, 5) * 2, Math.Max(1, (9 - step) * 3));
 
                 TargetMhz = mhz;
                 WritePlateauNamed(mvRetained, curve, Path.Combine(Root, "plateau-autotune.json"));
@@ -605,7 +605,7 @@ internal sealed partial class MainForm
             if (okBase)
             {
                 best = baseMhz;
-                for (int step = 1; step <= 4; step++)
+                for (int step = 1; step <= 8; step++)
                 {
                     int mhz = best + 15;
                     if (mhz > maxMhz) break;
