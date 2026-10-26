@@ -154,6 +154,75 @@ internal sealed partial class MainForm
         th.Start();
     }
 
+    /// <summary>Teste les trois profils de ventilation sur charge reelle et
+    /// retourne le profil retenu (le plus silencieux qui tient le seuil).</summary>
+    public string TestFanProfilesForPackage()
+    {
+        string[] profils = { "silence", "equilibre", "froid" };
+        var mesures = new List<string[]>();
+        string py = ResolvePython();
+        int seuil = _s.TempSlowdown > 0 ? _s.TempSlowdown - 10 : 80;
+
+        for (int p = 0; p < profils.Length; p++)
+        {
+            string profil = profils[p];
+            int idx = p;
+            UiProgress(string.Format("Ventilation : profil {0} ({1}/3)", profil, idx + 1),
+                10 + idx * 3, Math.Max(1, (profils.Length - idx) * 65 / 60));
+
+            try { File.Copy(Path.Combine(Root, "profil-" + profil + ".txt"), Path.Combine(Root, "fan-curve.txt"), true); }
+            catch (Exception e) { LogMsg("ventilation " + profil + " : " + e.Message); }
+            Thread.Sleep(4000);
+
+            Process load = null;
+            if (py != null)
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo(py, "\"C:\\Nvidia\\stress-long.py\" 60 2048")
+                    { UseShellExecute = false, CreateNoWindow = true };
+                    load = Process.Start(psi);
+                }
+                catch { }
+            }
+
+            Thread.Sleep(15000);
+            long sumRpm = 0; int n = 0, maxRpm = 0, maxGpu = 0, maxMem = 0;
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed.TotalSeconds < 45)
+            {
+                int r1, c1, r2, c2;
+                NvSensors.ReadFans(out r1, out c1, out r2, out c2);
+                if (r1 > 0) { sumRpm += r1; n++; if (r1 > maxRpm) maxRpm = r1; }
+                int g, h, m;
+                NvSensors.ReadTemps(out g, out h, out m);
+                if (g > maxGpu) maxGpu = g;
+                if (m > maxMem) maxMem = m;
+                Thread.Sleep(2000);
+            }
+            try { if (load != null && !load.HasExited) load.Kill(); } catch { }
+
+            int avg = n > 0 ? (int)(sumRpm / n) : 0;
+            LogMsg(string.Format("ventilation {0} : {1} tr/min moyen, max {2}, GPU max {3} C, mem max {4} C",
+                profil, avg, maxRpm, maxGpu, maxMem));
+            mesures.Add(new string[] { profil, avg.ToString(), maxGpu.ToString(), maxMem.ToString() });
+            Thread.Sleep(5000);
+        }
+
+        string choisi = "froid";
+        int bestRpm = int.MaxValue;
+        foreach (var m in mesures)
+        {
+            int rpm = int.Parse(m[1]);
+            int gpu = int.Parse(m[2]);
+            if (gpu <= seuil && rpm > 0 && rpm < bestRpm) { bestRpm = rpm; choisi = m[0]; }
+        }
+
+        try { File.Copy(Path.Combine(Root, "profil-" + choisi + ".txt"), Path.Combine(Root, "fan-curve.txt"), true); } catch { }
+        LogMsg("ventilation : seuil " + seuil + " C, profil retenu " + choisi);
+        return choisi;
+    }
+
     private void DoTestFanProfiles()
     {
         string[] profils = { "silence", "equilibre", "froid" };

@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<title>Comparatif origine / applique</title><style>
+body{background:#181818;color:#ddd;font-family:Segoe UI,sans-serif;margin:24px}
+h1{color:#76b900;font-size:22px;margin-bottom:4px}
+h2{color:#9ad32a;font-size:16px;margin-top:24px;border-bottom:1px solid #333;padding-bottom:4px}
+table{border-collapse:collapse;margin-top:10px;min-width:520px}
+th,td{padding:6px 12px;border-bottom:1px solid #2c2c2c;text-align:left}
+th{color:#aaa;font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.gain{color:#76b900;font-weight:600}.loss{color:#e06060;font-weight:600}
+.meta{color:#888;font-size:12px}
+</style></head><body>
+<h1>Comparatif origine / reglages appliques</h1>
+<div class="meta">2026-10-26 19:16 &middot; NVIDIA GeForce RTX 3080 Ti &middot; pilote 621.01</div>
+<h2>Detail par niveau de charge</h2>
+<table><tr><th>Charge</th><th>Origine</th><th>Applique</th><th>Gain MHz</th><th>Gain W</th><th>Gain C</th></tr>
+<tr><td>Legere</td><td class="num">1953 MHz &middot; 263,9 W &middot; 63 C</td><td class="num">1860 MHz &middot; 202,4 W &middot; 71 C</td><td class="num loss">-93 MHz</td><td class="num gain">-61,5 W</td><td class="num loss">+8 C</td></tr>
+<tr><td>Jeu</td><td class="num">1783 MHz &middot; 348,6 W &middot; 73 C</td><td class="num">1828 MHz &middot; 319,0 W &middot; 76 C</td><td class="num gain">+45 MHz</td><td class="num gain">-29,5 W</td><td class="num loss">+3 C</td></tr>
+<tr><td>Soutenue</td><td class="num">1823 MHz &middot; 348,9 W &middot; 77 C</td><td class="num">1860 MHz &middot; 295,2 W &middot; 76 C</td><td class="num gain">+37 MHz</td><td class="num gain">-53,7 W</td><td class="num gain">-1 C</td></tr>
+<tr><td>Lourde</td><td class="num">1655 MHz &middot; 349,0 W &middot; 78 C</td><td class="num">1634 MHz &middot; 319,5 W &middot; 77 C</td><td class="num loss">-21 MHz</td><td class="num gain">-29,5 W</td><td class="num gain">-1 C</td></tr>
+</table>
+<h2>Configuration appliquee</h2><table>
+<tr><th>Parametre</th><th>Valeur</th></tr>
+<tr><td>Undervolt</td><td>1845 MHz a 831 mV.</td></tr>
+<tr><td>Tension du plateau</td><td>831 mV</td></tr>
+<tr><td>Power limit</td><td>320 W</td></tr>
+<tr><td>Profil de ventilation</td><td>equilibre</td></tr>
+</table>
+<p class="meta">Charges PyTorch de 60 s par niveau. Les gains positifs (vert) sont favorables a la configuration appliquee.</p>
+</body></html>

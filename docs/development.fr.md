@@ -286,3 +286,93 @@ Trois défauts cumulés :
 Corrections : verrou unique `NvSensors._sync`, timer de l'interface suspendu
 pendant le test, échantillonnage dans un thread avec `Join` borné, et
 journalisation de chaque échantillon (`echantillon N : ... MHz / ... W`).
+
+---
+
+## 12. Consignes utilisateur et comparaison (v1.0.47)
+
+### 12.1 Trois consignes dans l'onglet Configuration
+
+| Champ | Rôle | Valeur 0 |
+|---|---|---|
+| Fréquence cible (MHz) | point de fonctionnement visé | déduite de la mesure d'origine |
+| Tension cible (mV) | impose la tension, sans recherche | recherche automatique |
+| Power limit max (W) | plafonne le calcul du PL | consommation jeu + 10 W |
+
+Les bornes sont calculées à l'exécution, à partir des caractéristiques de la
+carte, et affichées sous les champs :
+
+| Paramètre | Borne basse | Borne haute | Source |
+|---|---|---|---|
+| Fréquence | 500 MHz | `clocks.max.graphics` | plancher d'exploitation / VBIOS |
+| Tension | 700 mV | min(courbe, 1000 mV) | plancher de stabilité / courbe |
+| Power limit | `power.min_limit` | `power.default_limit` | nvidia-smi |
+
+Toute valeur hors plage est **refusée** avant le lancement du test :
+
+```
+package : valeur refusee - Tension 500 mV hors limites (700-1000 mV).
+```
+
+Les consignes peuvent aussi être passées en ligne de commande :
+
+```powershell
+C:\Nvidia\nvidiaconf.exe --package --mhz 1845 --mv 831 --pl 320
+C:\Nvidia\nvidiaconf.exe --compare
+```
+
+Les valeurs transitent par `C:\Nvidia\package-request.txt` : l'événement
+`NvidiaConf.Package` ne transporte pas de données, et une seconde instance ne
+doit pas être créée.
+
+### 12.2 Tension imposée
+
+Si `--mv` (ou le champ) est renseigné, la recherche est remplacée par **un seul
+test de 600 s** à cette tension. Si le test échoue, aucune modification n'est
+appliquée : la valeur sûre supérieure est proposée.
+
+### 12.3 Ventilation obligatoire
+
+Après la ligne de base d'origine, les trois profils (`silence`, `equilibre`,
+`froid`) sont mesurés sous charge PyTorch pendant 60 s. Le profil retenu est le
+**plus silencieux dont la température GPU maximale reste sous
+`TempSlowdown − 10 °C`**. Le choix est journalisé et reporté dans le rapport.
+
+### 12.4 Comparaison origine / appliqué
+
+Bouton **« Comparer origine / applique »** (onglet Rapport) : mesure les 4
+niveaux de charge en configuration d'origine, puis avec les réglages appliqués,
+et affiche un rapport HTML dans la fenêtre.
+
+Dernier résultat (26/10/2026) :
+
+| Charge | Origine | Appliqué | Gain MHz | Gain W |
+|---|---|---|---|---|
+| Légère | 1953 MHz / 264 W | 1860 MHz / 202 W | −93 | −62 |
+| Jeu | 1783 MHz / 349 W | 1828 MHz / 319 W | **+45** | **−30** |
+| Soutenue | 1823 MHz / 349 W | 1860 MHz / 295 W | **+37** | **−54** |
+| Lourde | 1655 MHz / 349 W | 1634 MHz / 320 W | −21 | −30 |
+
+### 12.5 Barre de progression
+
+Chaque étape affiche une action synthétique et le **temps restant estimé** :
+
+```
+Origine - charge Jeu (2/4)  (~6 min restantes)
+Ventilation : profil equilibre (2/3)  (~2 min restantes)
+Tension 831 mV (3/7)  (~44 min restantes)
+Package - charge Lourde (4/4)  (~4 min restantes)
+```
+
+### 12.6 Historique complémentaire
+
+| Version | Ajout |
+|---|---|
+| 1.0.40 | Champs tension et power limit cible |
+| 1.0.41 | Options `--mv` et `--pl` |
+| 1.0.42 | Planchers de sécurité (500 MHz, 700 mV) |
+| 1.0.43 | `MessageBox` désactivée hors session interactive |
+| 1.0.44 | Transmission des consignes CLI par fichier |
+| 1.0.45 | Bouton de comparaison + temps restant |
+| 1.0.46 | Profil de ventilation reporté dans le rapport |
+| 1.0.47 | Déclencheur `--compare` |

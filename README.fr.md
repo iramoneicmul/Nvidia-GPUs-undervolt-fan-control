@@ -18,6 +18,40 @@ Tout passe par NVAPI, une tâche planifiée et un service Windows léger.
 Résultat : **plus de performance qu'à l'origine, 30 W de moins, une mémoire
 plus froide et des ventilateurs plus silencieux.**
 
+## Consignes et comparaison
+
+L'onglet Configuration accepte trois consignes facultatives :
+
+| Champ | Bornes (calculées sur la carte) |
+|---|---|
+| Fréquence cible (MHz) | 500 .. `clocks.max.graphics` |
+| Tension cible (mV) | 700 .. min(courbe, 1000) |
+| Power limit max (W) | `power.min_limit` .. `power.default_limit` |
+
+Toute valeur hors plage est refusée avant le moindre test :
+
+```
+package : valeur refusee - Tension 500 mV hors limites (700-1000 mV).
+```
+
+Une tension cible remplace la recherche par un **unique test de 600 s**.
+
+**Le profil de ventilation est toujours testé** après la ligne de base
+d'origine : `silence`, `equilibre` et `froid` tournent sous charge et le profil
+le plus silencieux qui reste sous `TempSlowdown - 10 °C` est retenu.
+
+**Comparer origine / applique** (onglet Rapport, ou `--compare`) mesure les
+quatre niveaux de charge dans les deux configurations et affiche un rapport HTML
+dans la fenêtre. Chaque étape indique l'action en cours et le **temps restant en
+minutes**.
+
+```powershell
+C:\Nvidia\nvidiaconf.exe --package --mhz 1845 --mv 831 --pl 320
+C:\Nvidia\nvidiaconf.exe --compare
+```
+
+---
+
 ## Compatibilité
 
 L'application ne se base **pas** sur une liste de modèles : elle vérifie les
@@ -381,8 +415,8 @@ préférable : il installe aussi le moteur NVAPI et le service de ventilation.
 ### Empreintes (v1.0.0)
 
 ```
-6862b3c1a6317ca00d82da80b65383d422a72995a56ae915300b728be14af56f  nvidiaconf.exe
-934cdc4bccca44f9a672a3df5b682ea0da49ce81fad3b2f8f63f995d6d902460  nvidiaconf.msi
+734eb1a25716c26dcd1ea31a79aff4ffb1e52c9a84339084723755ca7ef4516b  nvidiaconf.exe
+83089e62013e43882ec52d1f1adac2538c9562853b0278da09544ff0919270d2  nvidiaconf.msi
 ```
 
 ### Premier lancement

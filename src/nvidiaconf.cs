@@ -289,10 +289,16 @@ internal sealed partial class MainForm : Form
     private ComboBox _profileBox;
     private WebBrowser _reportView;
     private TextBox _targetMhzBox;
+    private TextBox _targetMvBox;
+    private TextBox _targetPlBox;
+    private Label _boundsLabel;
+    public static int RequestedMv;
+    public static int RequestedPowerLimit;
     private Label _lProfile;
     private volatile bool _busy;
     public static volatile bool ShowRequested;
     public static volatile bool PackageRequested;
+    public static volatile bool CompareRequested;
 
     private readonly bool _startHidden;
 
@@ -534,42 +540,25 @@ internal sealed partial class MainForm : Form
             "Undervolt", "Power limit", "Profil ventilation", "Courbe 831 mV"
         });
 
-        var lblTarget = new Label
-        {
-            Text = "Frequence cible (MHz) :",
-            ForeColor = Color.Silver,
-            AutoSize = false,
-            Size = new Size(150, 18),
-            Location = new Point(18, y3 + 10)
-        };
-        tConf.Controls.Add(lblTarget);
+        _targetMhzBox = AddTargetRow(tConf, "Frequence cible (MHz) :", y3 + 10, "(0 = deduite de l'origine)");
+        _targetMvBox = AddTargetRow(tConf, "Tension cible (mV) :", y3 + 36, "(0 = recherche automatique)");
+        _targetPlBox = AddTargetRow(tConf, "Power limit max (W) :", y3 + 62, "(0 = consomme + 10 W)");
 
-        _targetMhzBox = new TextBox
+        _boundsLabel = new Label
         {
-            Location = new Point(172, y3 + 6),
-            Size = new Size(60, 22),
-            BackColor = Color.FromArgb(45, 45, 45),
-            ForeColor = Color.Gainsboro,
-            BorderStyle = BorderStyle.FixedSingle,
-            Text = "0"
-        };
-        tConf.Controls.Add(_targetMhzBox);
-
-        var lblHint = new Label
-        {
-            Text = "(0 = deduite de l'origine)",
+            Text = "Limites de la carte : calcul en cours...",
             ForeColor = Color.Gray,
             AutoSize = false,
-            Size = new Size(160, 18),
-            Location = new Point(238, y3 + 10)
+            Size = new Size(430, 32),
+            Location = new Point(18, y3 + 90)
         };
-        tConf.Controls.Add(lblHint);
+        tConf.Controls.Add(_boundsLabel);
 
-        var btnPackage = MakeButton("Determiner le package optimal", 18, y3 + 38, 260);
+        var btnPackage = MakeButton("Determiner le package optimal", 18, y3 + 128, 260);
         btnPackage.Click += (o, e) => PackageButton();
         tConf.Controls.Add(btnPackage);
 
-        var btnReport = MakeButton("Ouvrir le rapport comparatif", 18, y3 + 74, 260);
+        var btnReport = MakeButton("Ouvrir le rapport comparatif", 18, y3 + 164, 260);
         btnReport.Click += (o, e) => OpenComparativeReport();
         tConf.Controls.Add(btnReport);
 
@@ -581,17 +570,21 @@ internal sealed partial class MainForm : Form
             Height = 40,
             BackColor = Color.FromArgb(28, 28, 28)
         };
-        var btnRafraichir = MakeButton("Actualiser le rapport", 8, 6, 190);
+        var btnRafraichir = MakeButton("Actualiser", 8, 6, 110);
         btnRafraichir.Click += (o, e) => RefreshReportTab();
         reportBar.Controls.Add(btnRafraichir);
 
+        var btnCompare = MakeButton("Comparer origine / applique", 126, 6, 250);
+        btnCompare.Click += (o, e) => CompareButton();
+        reportBar.Controls.Add(btnCompare);
+
         var lblReport = new Label
         {
-            Text = "Rapport comparatif avant / apres",
+            Text = "Rapport comparatif",
             ForeColor = Color.Gray,
             AutoSize = false,
-            Size = new Size(280, 18),
-            Location = new Point(212, 12)
+            Size = new Size(120, 18),
+            Location = new Point(386, 12)
         };
         reportBar.Controls.Add(lblReport);
 
@@ -618,6 +611,42 @@ internal sealed partial class MainForm : Form
             "Temperature GPU", "Hotspot", "Temperature memoire",
             "Ventilateur 1", "Ventilateur 2", "Charge GPU"
         });
+    }
+
+    // Ligne de saisie : libelle, zone de texte, aide. Retourne la zone de texte.
+    private TextBox AddTargetRow(TabPage page, string label, int y, string hint)
+    {
+        var lbl = new Label
+        {
+            Text = label,
+            ForeColor = Color.Silver,
+            AutoSize = false,
+            Size = new Size(150, 18),
+            Location = new Point(18, y)
+        };
+        page.Controls.Add(lbl);
+
+        var box = new TextBox
+        {
+            Location = new Point(172, y - 4),
+            Size = new Size(60, 22),
+            BackColor = Color.FromArgb(45, 45, 45),
+            ForeColor = Color.Gainsboro,
+            BorderStyle = BorderStyle.FixedSingle,
+            Text = "0"
+        };
+        page.Controls.Add(box);
+
+        var help = new Label
+        {
+            Text = hint,
+            ForeColor = Color.Gray,
+            AutoSize = false,
+            Size = new Size(190, 18),
+            Location = new Point(238, y)
+        };
+        page.Controls.Add(help);
+        return box;
     }
 
     private Button MakeButton(string text, int x, int y, int w)
@@ -846,6 +875,12 @@ internal sealed partial class MainForm : Form
             PackageButton();
         }
 
+        if (CompareRequested)
+        {
+            CompareRequested = false;
+            CompareButton();
+        }
+
         if (ShowRequested)
         {
             ShowRequested = false;
@@ -907,6 +942,7 @@ internal sealed partial class MainForm : Form
                     if (x.Groups[1].Value == "Min") _s.PowerMin = (int)val;
                     else if (x.Groups[1].Value == "Max") _s.PowerMax = (int)val;
                     else _s.PowerDefault = (int)val;
+                    UpdateTargetBounds();
                 }
 
                 string temps = Run(Smi, "-q -d TEMPERATURE");
@@ -1300,7 +1336,7 @@ internal static class Program
         Log("demarrage args=" + string.Join(" ", args));
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false;
+        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i];
@@ -1311,10 +1347,21 @@ internal static class Program
             if (a == "--freqtest") freqTest = true;
             if (a == "--fantest") fanTest = true;
             if (a == "--package") packageTest = true;
+            if (a == "--compare") compareTest = true;
             if (a == "--mhz" && i + 1 < args.Length)
             {
-                int mv;
-                if (int.TryParse(args[i + 1], out mv)) MainForm.RequestedMhz = mv;
+                int v;
+                if (int.TryParse(args[i + 1], out v)) MainForm.RequestedMhz = v;
+            }
+            if (a == "--mv" && i + 1 < args.Length)
+            {
+                int v;
+                if (int.TryParse(args[i + 1], out v)) MainForm.RequestedMv = v;
+            }
+            if (a == "--pl" && i + 1 < args.Length)
+            {
+                int v;
+                if (int.TryParse(args[i + 1], out v)) MainForm.RequestedPowerLimit = v;
             }
         }
 
@@ -1334,10 +1381,41 @@ internal static class Program
             return 0;
         }
 
+        if (compareTest)
+        {
+            bool sentC = false;
+            try
+            {
+                using (var ev = EventWaitHandle.OpenExisting("NvidiaConf.Compare"))
+                {
+                    ev.Set();
+                    sentC = true;
+                }
+            }
+            catch { }
+
+            if (sentC) { Log("compare : demande transmise a l'instance en cours"); return 0; }
+
+            var cf = new MainForm(false, false);
+            cf.StartPackageOnShown();   // la comparaison se lance depuis l'onglet Rapport
+            try { Application.Run(cf); } catch (Exception e) { Log("compare erreur : " + e.Message); }
+            return 0;
+        }
+
         if (packageTest)
         {
             // On confie le test a l'instance deja en cours (icone de la zone de
             // notification) pour que la progression s'affiche dans SA fenetre.
+            // Les consignes --mhz/--mv/--pl doivent suivre la demande :
+            // l'evenement ne transporte pas de donnees.
+            try
+            {
+                File.WriteAllText(Path.Combine(root, "package-request.txt"),
+                    "mhz=" + MainForm.RequestedMhz + "\nmv=" + MainForm.RequestedMv +
+                    "\npl=" + MainForm.RequestedPowerLimit + "\n");
+            }
+            catch { }
+
             bool sent = false;
             try
             {
@@ -1420,6 +1498,8 @@ internal static class Program
         _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "NvidiaConf.Show");
         EventWaitHandle packageEvent = null;
         try { packageEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "NvidiaConf.Package"); } catch { }
+        EventWaitHandle compareEvent = null;
+        try { compareEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "NvidiaConf.Compare"); } catch { }
 
         var form = new MainForm(hidden, tune);
         var wake = new Thread(() =>
@@ -1447,6 +1527,21 @@ internal static class Program
             });
             pkg.IsBackground = true;
             pkg.Start();
+        }
+
+        if (compareEvent != null)
+        {
+            var cmp = new Thread(() =>
+            {
+                while (true)
+                {
+                    compareEvent.WaitOne();
+                    MainForm.CompareRequested = true;
+                    MainForm.ShowRequested = true;
+                }
+            });
+            cmp.IsBackground = true;
+            cmp.Start();
         }
 
         EnsureConfigurationApplied(root);

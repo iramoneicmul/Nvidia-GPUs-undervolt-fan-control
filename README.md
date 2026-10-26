@@ -18,6 +18,39 @@ Windows service.
 The result: **more performance than stock, 30 W less power, lower memory
 temperatures and quieter fans.**
 
+## Targets and comparison
+
+The Configuration tab accepts three optional targets:
+
+| Field | Bounds (computed from the card) |
+|---|---|
+| Target frequency (MHz) | 500 .. `clocks.max.graphics` |
+| Target voltage (mV) | 700 .. min(curve, 1000) |
+| Max power limit (W) | `power.min_limit` .. `power.default_limit` |
+
+Out-of-range values are refused before any test starts:
+
+```
+package : valeur refusee - Tension 500 mV hors limites (700-1000 mV).
+```
+
+A target voltage replaces the search with a single 600 s stability test.
+
+**Fan profile is always tested** after the stock baseline: `silence`,
+`equilibre` and `froid` run under load and the quietest profile that stays under
+`TempSlowdown - 10 C` is kept.
+
+**Compare stock / applied** (Report tab, or `--compare`) measures the four load
+levels in both configurations and displays an HTML report inside the window.
+Every step shows the action and the **remaining time in minutes**.
+
+```powershell
+C:\Nvidia\nvidiaconf.exe --package --mhz 1845 --mv 831 --pl 320
+C:\Nvidia\nvidiaconf.exe --compare
+```
+
+---
+
 ## Compatibility
 
 The application does **not** rely on a model list — it checks capabilities at
@@ -370,8 +403,8 @@ it also installs the NVAPI engine and the fan service.
 ### Checksums (v1.0.0)
 
 ```
-6862b3c1a6317ca00d82da80b65383d422a72995a56ae915300b728be14af56f  nvidiaconf.exe
-934cdc4bccca44f9a672a3df5b682ea0da49ce81fad3b2f8f63f995d6d902460  nvidiaconf.msi
+734eb1a25716c26dcd1ea31a79aff4ffb1e52c9a84339084723755ca7ef4516b  nvidiaconf.exe
+83089e62013e43882ec52d1f1adac2538c9562853b0278da09544ff0919270d2  nvidiaconf.msi
 ```
 
 ### First run

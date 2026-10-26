@@ -23,6 +23,11 @@ using System.Windows.Forms;
 
 internal sealed partial class MainForm
 {
+    // Bornes de saisie (caracteristiques de la carte, lues au demarrage)
+    private static bool _boundsRead;
+    private static int _bMvMin = 700, _bMvMax = 1000;
+    private string _fanProfileChosen = "equilibre";
+
     private sealed class Measure
     {
         public int Mhz;
@@ -54,6 +59,68 @@ internal sealed partial class MainForm
         catch (Exception e) { LogMsg("CliPackage " + e); }
     }
 
+    // ------------------------------------------------------------------
+    //  Bornes de saisie, deduites des caracteristiques de la carte
+    // ------------------------------------------------------------------
+    private void ComputeTargetBounds(out int mhzMin, out int mhzMax,
+                                     out int mvMin, out int mvMax,
+                                     out int plMin, out int plMax)
+    {
+        if (!_boundsRead)
+        {
+            _boundsRead = true;
+            try
+            {
+                var curve = ReadStockCurve();
+                int cmin = int.MaxValue, cmax = 0;
+                foreach (var kv in curve)
+                {
+                    if (kv.Key < cmin) cmin = kv.Key;
+                    if (kv.Key > cmax) cmax = kv.Key;
+                }
+                if (cmin != int.MaxValue && cmax > cmin) { _bMvMin = cmin; _bMvMax = cmax; }
+            }
+            catch { }
+        }
+
+        // Frequence : plancher de 500 MHz (en dessous, aucune charge utile et
+        // aucune garantie de stabilite) jusqu'a la frequence maximale declaree.
+        mhzMin = 500;
+        mhzMax = _s.ClockMax > 0 ? _s.ClockMax : 2100;
+
+        // Tension : plancher de securite a 700 mV (en dessous, aucune carte
+        // recente n'est stable sous charge), plafond a 1000 mV.
+        mvMin = Math.Max(_bMvMin, 700);
+        mvMax = Math.Min(_bMvMax, 1000);
+
+        // Power limit : de la limite minimale a la valeur d'origine du VBIOS.
+        // Depasser le defaut ne presente aucun interet et augmente le risque.
+        ReadPowerLimits();
+        plMin = PlMin;
+        plMax = PlDefault;
+    }
+
+    // Progression synthetique : action en cours + temps restant estime.
+    private void UiProgress(string label, int percent, int remainingMinutes)
+    {
+        Ui(() =>
+        {
+            _step.Text = label + (remainingMinutes > 0 ? "  (~" + remainingMinutes + " min restantes)" : "");
+            _bar.Value = Math.Max(0, Math.Min(100, percent));
+        });
+    }
+
+    private void UpdateTargetBounds()
+    {
+        if (_boundsLabel == null) return;
+        int mhzMin, mhzMax, mvMin, mvMax, plMin, plMax;
+        ComputeTargetBounds(out mhzMin, out mhzMax, out mvMin, out mvMax, out plMin, out plMax);
+        _boundsLabel.Text = string.Format(
+            "Limites carte : {0}-{1} MHz | {2}-{3} mV | {4}-{5} W\n" +
+            "Toute valeur hors de ces plages est refusee.",
+            mhzMin, mhzMax, mvMin, mvMax, plMin, plMax);
+    }
+
     public void StartPackageOnShown()
     {
         Shown += (o, e) => PackageButton();
@@ -62,9 +129,63 @@ internal sealed partial class MainForm
     private void PackageButton()
     {
         if (_busy) return;
-        int requested = 0;
+
+        int requested = 0, requestedMv = 0, requestedPl = 0;
         if (_targetMhzBox != null) int.TryParse(_targetMhzBox.Text.Trim(), out requested);
+        if (_targetMvBox != null) int.TryParse(_targetMvBox.Text.Trim(), out requestedMv);
+        if (_targetPlBox != null) int.TryParse(_targetPlBox.Text.Trim(), out requestedPl);
+
+        // Consignes transmises par la ligne de commande (fichier de requete).
+        string reqFile = Path.Combine(Root, "package-request.txt");
+        if (File.Exists(reqFile))
+        {
+            try
+            {
+                foreach (string line in File.ReadAllLines(reqFile))
+                {
+                    var kv = line.Split('=');
+                    if (kv.Length != 2) continue;
+                    int v;
+                    if (!int.TryParse(kv[1].Trim(), out v)) continue;
+                    if (kv[0].Trim() == "mhz" && requested == 0) requested = v;
+                    if (kv[0].Trim() == "mv" && requestedMv == 0) requestedMv = v;
+                    if (kv[0].Trim() == "pl" && requestedPl == 0) requestedPl = v;
+                }
+            }
+            catch { }
+            try { File.Delete(reqFile); } catch { }
+        }
+
+        // Valeurs statiques eventuelles, si rien d'autre n'a ete fourni.
+        if (requested == 0) requested = MainForm.RequestedMhz;
+        if (requestedMv == 0) requestedMv = MainForm.RequestedMv;
+        if (requestedPl == 0) requestedPl = MainForm.RequestedPowerLimit;
+
+        int mhzMin, mhzMax, mvMin, mvMax, plMin, plMax;
+        ComputeTargetBounds(out mhzMin, out mhzMax, out mvMin, out mvMax, out plMin, out plMax);
+
+        string invalid = null;
+        if (requested != 0 && (requested < mhzMin || requested > mhzMax))
+            invalid = string.Format("Frequence {0} MHz hors limites ({1}-{2} MHz).", requested, mhzMin, mhzMax);
+        else if (requestedMv != 0 && (requestedMv < mvMin || requestedMv > mvMax))
+            invalid = string.Format("Tension {0} mV hors limites ({1}-{2} mV).", requestedMv, mvMin, mvMax);
+        else if (requestedPl != 0 && (requestedPl < plMin || requestedPl > plMax))
+            invalid = string.Format("Power limit {0} W hors limites ({1}-{2} W).", requestedPl, plMin, plMax);
+
+        if (invalid != null)
+        {
+            LogMsg("package : valeur refusee - " + invalid);
+            if (Environment.UserInteractive)
+                MessageBox.Show(invalid + "\n\nEntrez 0 pour laisser nvidiaconf determiner la valeur.",
+                    "Valeur hors limites", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         MainForm.RequestedMhz = requested;
+        MainForm.RequestedMv = requestedMv;
+        MainForm.RequestedPowerLimit = requestedPl;
+        LogMsg(string.Format("package : consignes utilisateur {0} MHz / {1} mV / {2} W (0 = auto)",
+            requested, requestedMv, requestedPl));
         _busy = true;
         // suspendre le rafraichissement de l'interface : ses appels NVAPI
         // concurrents provoquaient un interblocage avec ceux de la mesure.
@@ -118,10 +239,17 @@ internal sealed partial class MainForm
         for (int i = 0; i < Levels.Length; i++)
         {
             int idx = i;
-            Ui(() => { _step.Text = string.Format("Origine - charge {0} ({1}/4)", LevelNames[idx], idx + 1); _bar.Value = 2 + idx * 5; });
+            UiProgress(string.Format("Origine - charge {0} ({1}/4)", LevelNames[idx], idx + 1),
+                2 + idx * 5, Math.Max(1, (Levels.Length - idx) * 110 / 60));
             stock[LevelNames[i]] = MeasureDetailed(py, Levels[i], 60);
             LogMsg("package origine " + LevelNames[i] + " : " + stock[LevelNames[i]].Line());
         }
+
+        // ---------- 1bis) ventilation : test obligatoire apres l'origine ----------
+        Ui(() => { _step.Text = "Test obligatoire des profils de ventilation"; _bar.Value = 10; });
+        string fanProfile = TestFanProfilesForPackage();
+        _fanProfileChosen = fanProfile;
+        LogMsg("package : profil de ventilation retenu " + fanProfile);
 
         // ---------- 2) frequence cible ----------
         int target;
@@ -148,6 +276,7 @@ internal sealed partial class MainForm
             LogMsg("package : moteur de test incomplet (python=" + (pyPath ?? "absent") +
                    ", stability.py=" + File.Exists(stab) + ")");
             Ui(() => { _step.Text = "Moteur de test indisponible (PyTorch / stability.py)."; });
+            if (Environment.UserInteractive)
             MessageBox.Show(
                 "Le moteur de test est incomplet :\n" +
                 "  PyTorch : " + (pyPath == null ? "absent" : "present") + "\n" +
@@ -164,58 +293,95 @@ internal sealed partial class MainForm
 
         int lastOk = -1, firstFail = -1;
         var rows = new List<string>();
+        int mvRetained;
 
-        for (int i = 0; i < cands.Count; i++)
+        if (RequestedMv > 0)
         {
-            int mv = cands[i];
-            int idx = i;
-            Ui(() => { _step.Text = string.Format("Tension {0} mV ({1}/{2}) - {3} min", mv, idx + 1, cands.Count, Math.Max(1, StabilitySeconds / 60)); _bar.Value = 22 + (int)(55.0 * idx / cands.Count); });
-
+            // Tension imposee par l'utilisateur : un seul test de confirmation.
+            int mv = RequestedMv;
+            UiProgress(string.Format("Tension imposee {0} mV - test de stabilite", mv),
+                30, Math.Max(1, StabilitySeconds / 60));
             WriteMarker(mv);
             WritePlateau(mv, curve);
             ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
 
-            // PyTorch est plus severe qu'OpenCL : priorite pour la securite.
-            string res = (ResolvePython() != null)
-                ? RunPythonStability()
-                : (OpenClTest.Available ? OpenClTest.Run(StabilitySeconds, 2048, null) : "aucun moteur");
-
+            string res = RunPythonStability();
             int ecarts = ParseEcarts(res);
-            LogMsg(string.Format("package tension {0} mV -> {1}", mv, res.Replace("\n", " ")));
+            LogMsg(string.Format("package tension imposee {0} mV -> {1}", mv, res.Replace("\n", " ")));
             rows.Add(string.Format("| {0} | {1} | {2} |", mv,
                 res.Replace("|", "/"), ecarts == 0 ? "stable" : "**echec**"));
 
-            if (res.Contains("aucun moteur") || res.Contains("aucun resultat"))
+            if (ecarts != 0)
             {
-                LogMsg("package : moteur muet, arret de la recherche");
-                Ui(() => { _step.Text = "Moteur de test muet - recherche interrompue."; });
+                int up = int.MaxValue;
+                foreach (int c in curve.Keys) if (c > mv && c < up) up = c;
+                string prop = up == int.MaxValue ? "aucune" : up + " mV";
+                LogMsg("package : tension imposee instable, valeur sure proposee " + prop);
+                Ui(() => { _step.Text = "Tension imposee instable - arret."; });
+                if (Environment.UserInteractive)
+                    MessageBox.Show("La tension de " + mv + " mV est instable.\n\nValeur sure proposee : " + prop + ".",
+                        "Tension instable", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 ClearMarker();
                 return;
             }
-
-            if (ecarts == 0) lastOk = mv;
-            else { firstFail = mv; break; }
+            mvRetained = mv;
         }
+        else
+        {
+            for (int i = 0; i < cands.Count; i++)
+            {
+                int mv = cands[i];
+                int idx = i;
+                UiProgress(string.Format("Tension {0} mV ({1}/{2})", mv, idx + 1, cands.Count),
+                    22 + (int)(55.0 * idx / cands.Count),
+                    Math.Max(1, (cands.Count - idx) * (StabilitySeconds + 40) / 60));
 
-        int mvRetained = lastOk;
-        int okIndex = cands.IndexOf(lastOk);
-        if (okIndex > 0) mvRetained = cands[okIndex - 1];
+                WriteMarker(mv);
+                WritePlateau(mv, curve);
+                ApplyTuning(Path.Combine(Root, "plateau-autotune.json"));
 
-        // Marge de securite sur la tension. Un test court ne peut pas detecter
-        // une instabilite tres rare (2 ecarts sur 28 000 iterations mesurees
-        // manuellement) : on applique donc 3 % de marge, soit ~4 pas de 6,25 mV.
-        int margin = (int)Math.Ceiling(lastOk * 0.03 / 6.25) * 6;
-        int safe = lastOk + Math.Max(6, margin);
-        int hi = 0;
-        foreach (int c in cands) if (c > hi) hi = c;
-        if (safe > hi) safe = hi;
+                // PyTorch est plus severe qu'OpenCL : priorite pour la securite.
+                string res = (ResolvePython() != null)
+                    ? RunPythonStability()
+                    : (OpenClTest.Available ? OpenClTest.Run(StabilitySeconds, 2048, null) : "aucun moteur");
 
-        // La courbe n'accepte que des paliers de 6,25 mV : on arrondit au
-        // palier superieur ou egal, jamais en dessous de la marge.
-        int rounded = hi;
-        foreach (int c in cands) if (c >= safe && c < rounded) rounded = c;
-        if (rounded > mvRetained) mvRetained = rounded;
-        LogMsg(string.Format("package : derniere tension stable {0} mV -> marge 3 % -> {1} mV", lastOk, mvRetained));
+                int ecarts = ParseEcarts(res);
+                LogMsg(string.Format("package tension {0} mV -> {1}", mv, res.Replace("\n", " ")));
+                rows.Add(string.Format("| {0} | {1} | {2} |", mv,
+                    res.Replace("|", "/"), ecarts == 0 ? "stable" : "**echec**"));
+
+                if (res.Contains("aucun moteur") || res.Contains("aucun resultat"))
+                {
+                    LogMsg("package : moteur muet, arret de la recherche");
+                    Ui(() => { _step.Text = "Moteur de test muet - recherche interrompue."; });
+                    ClearMarker();
+                    return;
+                }
+
+                if (ecarts == 0) lastOk = mv;
+                else { firstFail = mv; break; }
+            }
+
+            mvRetained = lastOk;
+            int okIndex = cands.IndexOf(lastOk);
+            if (okIndex > 0) mvRetained = cands[okIndex - 1];
+
+            // Marge de securite : un test court ne peut pas detecter une
+            // instabilite tres rare (2 ecarts sur 28 000 iterations mesurees
+            // manuellement) : on applique 3 % de marge, soit ~4 pas.
+            int margin = (int)Math.Ceiling(lastOk * 0.03 / 6.25) * 6;
+            int safe = lastOk + Math.Max(6, margin);
+            int hi = 0;
+            foreach (int c in cands) if (c > hi) hi = c;
+            if (safe > hi) safe = hi;
+
+            // La courbe n'accepte que des paliers de 6,25 mV : on arrondit au
+            // palier superieur ou egal, jamais en dessous de la marge.
+            int rounded = hi;
+            foreach (int c in cands) if (c >= safe && c < rounded) rounded = c;
+            if (rounded > mvRetained) mvRetained = rounded;
+            LogMsg(string.Format("package : derniere tension stable {0} mV -> marge 3 % -> {1} mV", lastOk, mvRetained));
+        }
         ClearMarker();
         LogMsg("package : tension retenue " + mvRetained + " mV");
 
@@ -226,7 +392,7 @@ internal sealed partial class MainForm
         Thread.Sleep(3000);
 
         // ---------- 4) power limit ----------
-        Ui(() => { _step.Text = "Determination du power limit..."; _bar.Value = 80; });
+        UiProgress("Determination du power limit (mesure en jeu)", 80, 3);
         var jeu = MeasureDetailed(py, 2048, 45);
 
         // Marge de securite : +10 W au-dessus de la consommation reelle en jeu,
@@ -234,7 +400,7 @@ internal sealed partial class MainForm
         // Plafond : valeur d'origine du VBIOS, lue sur la carte (pas de valeur
         // codee en dur : chaque modele a ses propres limites).
         int pl = (int)(Math.Ceiling((jeu.Watts + 10) / 10.0) * 10);
-        int plOrigin = PlDefault;
+        int plOrigin = RequestedPowerLimit > 0 ? Math.Min(RequestedPowerLimit, PlDefault) : PlDefault;
         if (pl < 300) pl = 300;
         if (pl > plOrigin) pl = plOrigin;
         LogMsg(string.Format("package : conso jeu {0:0.0} W, marge +10 W -> {1} W (plafond carte {2} W)",
@@ -243,13 +409,14 @@ internal sealed partial class MainForm
         LogMsg("package : consommation en jeu " + jeu.Watts.ToString("0.0") + " W -> power limit " + pl + " W");
 
         // ventilation : profil equilibre
-        try { File.Copy(Path.Combine(Root, "profil-equilibre.txt"), Path.Combine(Root, "fan-curve.txt"), true); } catch { }
+        try { File.Copy(Path.Combine(Root, "profil-" + fanProfile + ".txt"), Path.Combine(Root, "fan-curve.txt"), true); } catch { }
 
         // ---------- 5) mesure de la configuration optimisee ----------
         for (int i = 0; i < Levels.Length; i++)
         {
             int idx = i;
-            Ui(() => { _step.Text = string.Format("Package - charge {0} ({1}/4)", LevelNames[idx], idx + 1); _bar.Value = 82 + idx * 4; });
+            UiProgress(string.Format("Package - charge {0} ({1}/4)", LevelNames[idx], idx + 1),
+                82 + idx * 4, Math.Max(1, (Levels.Length - idx) * 110 / 60));
             opti[LevelNames[i]] = MeasureDetailed(py, Levels[i], 60);
             LogMsg("package optimise " + LevelNames[i] + " : " + opti[LevelNames[i]].Line());
         }
@@ -442,7 +609,7 @@ internal sealed partial class MainForm
         sb.AppendLine("| Frequence cible | **" + target + " MHz** |");
         sb.AppendLine("| Tension | **" + mv + " mV** |");
         sb.AppendLine("| Power limit | **" + pl + " W** |");
-        sb.AppendLine("| Ventilation | **equilibre** |");
+        sb.AppendLine("| Ventilation | **" + _fanProfileChosen + "** |");
         sb.AppendLine();
         sb.AppendLine("## Comparatif par niveau de charge");
         sb.AppendLine();
