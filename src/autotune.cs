@@ -89,9 +89,14 @@ internal sealed partial class MainForm
                 };
                 using (var p = Process.Start(psi))
                 {
-                    string o = p.StandardOutput.ReadToEnd();
-                    p.WaitForExit(20000);
-                    if (p.ExitCode == 0 && o.Trim().Length > 0) return c;
+                    var so = p.StandardOutput.ReadToEndAsync();
+                    var se = p.StandardError.ReadToEndAsync();
+                    if (!p.WaitForExit(20000)) { try { p.Kill(); } catch { } }
+                    else
+                    {
+                        string o = so.Wait(2000) ? so.Result : "";
+                        if (p.ExitCode == 0 && o.Trim().Length > 0) return c;
+                    }
                 }
             }
             catch { }
@@ -116,7 +121,7 @@ internal sealed partial class MainForm
         _busy = true;
         _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
         _bar.Value = 0;
-        _step.Text = "Preparation de la recherche...";
+        _step.Text = Lang.T("Preparation de la recherche...");
 
         var th = new Thread(() =>
         {
@@ -124,7 +129,7 @@ internal sealed partial class MainForm
             catch (Exception e)
             {
                 LogMsg("AUTOTUNE FATAL " + e);
-                Ui(() => { _step.Text = "Echec : " + e.Message; });
+                Ui(() => { _step.Text = Lang.T("Echec : ") + e.Message; });
             }
             finally
             {
@@ -147,7 +152,7 @@ internal sealed partial class MainForm
         var stock = ReadStockCurve();
         if (stock.Count == 0)
         {
-            Ui(() => { _step.Text = "Courbe de reference introuvable."; });
+            Ui(() => { _step.Text = Lang.T("Courbe de reference introuvable."); });
             return;
         }
 
@@ -159,7 +164,7 @@ internal sealed partial class MainForm
 
         if (cands.Count == 0)
         {
-            Ui(() => { _step.Text = "Aucun palier de tension utilisable."; });
+            Ui(() => { _step.Text = Lang.T("Aucun palier de tension utilisable."); });
             return;
         }
 
@@ -197,7 +202,7 @@ internal sealed partial class MainForm
                     LogMsg("arret de l'optimisation : crash du pilote a " + mv + " mV");
                     EmergencyRestore();
                     ClearMarker();
-                    Ui(() => { _step.Text = "Test interrompu : instabilite detectee a " + mv + " mV. Configuration d'origine restauree."; });
+                    Ui(() => { _step.Text = Lang.T("Test interrompu : instabilite detectee a ") + mv + " mV. Configuration d'origine restauree."; });
                     return;
                 }
                 break;
@@ -218,7 +223,7 @@ internal sealed partial class MainForm
         ClearMarker();
         ApplyFinal(retained, stock);
         WriteReport(lines, retained, firstFail);
-        Ui(() => { _bar.Value = 100; _step.Text = "Termine : " + retained + " mV / " + TargetMhz + " MHz"; });
+        Ui(() => { _bar.Value = 100; _step.Text = Lang.T("Termine : ") + retained + " mV / " + TargetMhz + " MHz"; });
     }
 
     // ------------------------------------------------------------------
@@ -386,7 +391,7 @@ internal sealed partial class MainForm
         // la courbe retenue devient la courbe active
         WritePlateauNamed(mv, stock, Path.Combine(Root, "plateau-active.json"));
         ApplyTuning(Path.Combine(Root, "plateau-active.json"));
-        Ps("& nvidia-smi -pl 320 | Out-Null");
+        Ps("& nvidia-smi -pl " + DefaultPowerLimit + " | Out-Null");
     }
 
     private void WritePlateauNamed(int mv, Dictionary<int, int> stock, string path)
@@ -431,7 +436,8 @@ internal sealed partial class MainForm
             sb.AppendLine("Palier retenu (avec marge) : **" + retained + " mV**");
             if (failed > 0) sb.AppendLine("Premier palier instable : " + failed + " mV");
             sb.AppendLine();
-            sb.AppendLine("Power limit applique : 320 W");
+            sb.AppendLine(Lang.French ? "Power limit applique : " + DefaultPowerLimit + " W"
+                                      : "Applied power limit: " + DefaultPowerLimit + " W");
             File.WriteAllText(path, sb.ToString());
             LogMsg("rapport ecrit : " + path);
         }
@@ -459,10 +465,15 @@ internal sealed partial class MainForm
             {
                 if (redirect != null)
                 {
-                    string o = p.StandardOutput.ReadToEnd();
-                    File.WriteAllText(redirect, o);
+                    var so = p.StandardOutput.ReadToEndAsync();
+                    if (!p.WaitForExit(timeoutMs)) { try { p.Kill(); } catch { } }
+                    else
+                    {
+                        string o = so.Wait(3000) ? so.Result : "";
+                        File.WriteAllText(redirect, o);
+                    }
                 }
-                p.WaitForExit(timeoutMs);
+                else p.WaitForExit(timeoutMs);
             }
         }
         catch (Exception e) { LogMsg("RunExe " + exe + " : " + e.Message); }

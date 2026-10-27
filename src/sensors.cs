@@ -92,8 +92,8 @@ internal sealed partial class MainForm
         _grid.DefaultCellStyle.ForeColor = Color.Gainsboro;
         _grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(45, 60, 25);
 
-        _grid.Columns.Add("c0", "Capteur");
-        _grid.Columns.Add("c1", "Valeur");
+        _grid.Columns.Add("c0", Lang.T("Capteur"));
+        _grid.Columns.Add("c1", Lang.T("Valeur"));
         _grid.Columns.Add("c2", "Min");
         _grid.Columns.Add("c3", "Max");
         _grid.Columns[0].FillWeight = 46;
@@ -194,7 +194,7 @@ internal sealed partial class MainForm
         var th = new Thread(() =>
         {
             try { DoTestFanProfiles(); }
-            catch (Exception e) { LogMsg("FAN TEST FATAL " + e); Ui(() => { _step.Text = "Echec : " + e.Message; }); }
+            catch (Exception e) { LogMsg("FAN TEST FATAL " + e); Ui(() => { _step.Text = Lang.T("Echec : ") + e.Message; }); }
             finally
             {
                 Ui(() =>
@@ -359,7 +359,7 @@ internal sealed partial class MainForm
         Ui(() =>
         {
             _bar.Value = 100;
-            _step.Text = "Test des profils termine (profil equilibre restaure).";
+            _step.Text = Lang.T("Test des profils termine (profil equilibre restaure).");
         });
     }
 }

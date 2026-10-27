@@ -327,20 +327,20 @@ internal sealed partial class MainForm : Form
         _tray.Text = "NVIDIA Configuration";
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Afficher", null, (o, e) => { Show(); WindowState = FormWindowState.Normal; Activate(); });
-        menu.Items.Add("Actualiser", null, (o, e) => Refresh(true));
+        menu.Items.Add(Lang.T("Afficher"), null, (o, e) => { Show(); WindowState = FormWindowState.Normal; Activate(); });
+        menu.Items.Add(Lang.T("Actualiser"), null, (o, e) => Refresh(true));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Appliquer la configuration", null, (o, e) => RunScript("apply-undervolt.ps1"));
-        var prof = new ToolStripMenuItem("Profil de ventilation");
-        prof.DropDownItems.Add("Silence", null, (o, e) => SetProfile("silence"));
-        prof.DropDownItems.Add("Equilibre", null, (o, e) => SetProfile("equilibre"));
-        prof.DropDownItems.Add("Froid", null, (o, e) => SetProfile("froid"));
+        menu.Items.Add(Lang.T("Appliquer la configuration"), null, (o, e) => RunScript("apply-undervolt.ps1"));
+        var prof = new ToolStripMenuItem(Lang.T("Profil de ventilation"));
+        prof.DropDownItems.Add(Lang.T("Silence"), null, (o, e) => SetProfile("silence"));
+        prof.DropDownItems.Add(Lang.T("Equilibre"), null, (o, e) => SetProfile("equilibre"));
+        prof.DropDownItems.Add(Lang.T("Froid"), null, (o, e) => SetProfile("froid"));
         menu.Items.Add(prof);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Epingler l'icone dans la barre", null, (o, e) => PromoteTrayIcon());
-        menu.Items.Add("Rapport comparatif", null, (o, e) => OpenComparativeReport());
-        menu.Items.Add("Ouvrir le dossier", null, (o, e) => Process.Start("explorer.exe", Root));
-        menu.Items.Add("Quitter", null, (o, e) => { _tray.Visible = false; Application.Exit(); });
+        menu.Items.Add(Lang.T("Epingler l'icone dans la barre"), null, (o, e) => PromoteTrayIcon());
+        menu.Items.Add(Lang.T("Rapport comparatif"), null, (o, e) => OpenComparativeReport());
+        menu.Items.Add(Lang.T("Ouvrir le dossier"), null, (o, e) => Process.Start("explorer.exe", Root));
+        menu.Items.Add(Lang.T("Quitter"), null, (o, e) => { _tray.Visible = false; Application.Exit(); });
         _tray.ContextMenuStrip = menu;
         _tray.MouseClick += (o, e) =>
         {
@@ -402,7 +402,7 @@ internal sealed partial class MainForm : Form
 
         _lProfile = new Label
         {
-            Text = "Profil de ventilation",
+            Text = Lang.T("Profil de ventilation"),
             ForeColor = Color.Silver,
             AutoSize = false,
             Size = new Size(160, 18),
@@ -419,7 +419,10 @@ internal sealed partial class MainForm : Form
             ForeColor = Color.Gainsboro,
             FlatStyle = FlatStyle.Flat
         };
-        _profileBox.Items.AddRange(new object[] { "silence", "equilibre", "froid" });
+        _profileBox.Items.AddRange(new object[]
+        {
+            Lang.T("silence"), Lang.French ? "equilibre" : "equilibre", Lang.T("froid")
+        });
         _profileBox.SelectedIndex = 1;
         _profileBox.SelectedIndexChanged += (o, e) => OnProfileChanged();
         bottom.Controls.Add(_profileBox);
@@ -437,7 +440,7 @@ internal sealed partial class MainForm : Form
 
         _step = new Label
         {
-            Text = "Pret.",
+            Text = Lang.T("Pret."),
             ForeColor = Color.Silver,
             AutoSize = false,
             Size = new Size(524, 18),
@@ -715,7 +718,7 @@ internal sealed partial class MainForm : Form
                 catch (Exception e)
                 {
                     ok = false;
-                    Ui(() => { _step.Text = "Echec : " + e.Message; });
+                    Ui(() => { _step.Text = Lang.T("Echec : ") + e.Message; });
                     break;
                 }
             }
@@ -761,8 +764,11 @@ internal sealed partial class MainForm : Form
                     LogMsg("mise a jour disponible : " + latest);
                     try
                     {
-                        _tray.ShowBalloonTip(10000, "Mise a jour disponible",
-                            "NVIDIA Configuration " + latest + " est disponible (version installee : " + current + ").",
+                        _tray.ShowBalloonTip(10000,
+                            Lang.French ? "Mise a jour disponible" : "Update available",
+                            Lang.French
+                                ? "NVIDIA Configuration " + latest + " est disponible (version installee : " + current + ")."
+                                : "NVIDIA Configuration " + latest + " is available (installed version: " + current + ").",
                             ToolTipIcon.Info);
                         menu_UpdateItem(latest);
                     }
@@ -779,7 +785,8 @@ internal sealed partial class MainForm : Form
         {
             if (_tray.ContextMenuStrip == null) return;
             if (_tray.ContextMenuStrip.Items.ContainsKey("maj")) return;
-            var item = new ToolStripMenuItem("Mise a jour " + latest + " disponible");
+            var item = new ToolStripMenuItem(Lang.T("Mise a jour ") + latest +
+                (Lang.French ? " disponible" : " available"));
             item.Name = "maj";
             item.Click += (o, e) => Process.Start(
                 "https://github.com/iramoneicmul/Nvidia-GPUs-undervolt-fan-control/releases/latest");
@@ -806,6 +813,13 @@ internal sealed partial class MainForm : Form
     private void ApplyLanguage(string code)
     {
         if (code == Lang.Current) return;
+        if (_busy)
+        {
+            MessageBox.Show(Lang.T("Changement de langue impossible pendant un test.") +
+                (Lang.French ? "\n\nAttendez la fin du test." : "\n\nWait for the test to finish."),
+                Lang.T("Langue"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
         Lang.Set(code);
         LogMsg("langue : " + code);
         try
@@ -860,6 +874,13 @@ internal sealed partial class MainForm : Form
             }
         }
         catch { }
+    }
+
+    public void CliApply()
+    {
+        ApplyConfig();
+        Thread.Sleep(4000);
+        LogMsg("apply : configuration appliquee par la ligne de commande");
     }
 
     private void ApplyConfig()
@@ -1024,9 +1045,16 @@ internal sealed partial class MainForm : Form
             };
             using (var p = Process.Start(psi))
             {
-                string o = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(10000);
-                return o;
+                // Lecture asynchrone : ReadToEnd() bloquait indefiniment si le
+                // processus ne fermait pas son flux (nvidia-smi sous charge).
+                var so = p.StandardOutput.ReadToEndAsync();
+                var se = p.StandardError.ReadToEndAsync();
+                if (!p.WaitForExit(10000))
+                {
+                    try { p.Kill(); } catch { }
+                    return "";
+                }
+                return so.Wait(2000) ? so.Result : "";
             }
         }
         catch { return ""; }
@@ -1160,7 +1188,7 @@ internal sealed partial class MainForm : Form
         }
         catch (Exception e)
         {
-            _lStatus.Text = "Erreur : " + e.Message;
+            _lStatus.Text = Lang.T("Erreur : ") + e.Message;
         }
     }
 
@@ -1222,8 +1250,9 @@ internal sealed partial class MainForm : Form
             };
             using (var p = Process.Start(psi))
             {
-                string o = p.StandardOutput.ReadToEnd().Trim();
-                p.WaitForExit(20000);
+                var so = p.StandardOutput.ReadToEndAsync();
+                if (!p.WaitForExit(20000)) { try { p.Kill(); } catch { } _s.Torch = "absent"; return; }
+                string o = so.Wait(2000) ? so.Result.Trim() : "";
                 _s.Torch = (p.ExitCode == 0 && o.Length > 0) ? o : "absent";
             }
         }
@@ -1391,7 +1420,7 @@ internal sealed partial class MainForm : Form
         _busy = true;
         _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
         _bar.Style = ProgressBarStyle.Marquee;
-        _step.Text = "Installation de PyTorch via pip (peut durer plusieurs minutes)...";
+        _step.Text = Lang.T("Installation de PyTorch via pip (peut durer plusieurs minutes)...");
 
         var th = new Thread(() =>
         {
@@ -1413,7 +1442,7 @@ internal sealed partial class MainForm : Form
             {
                 _bar.Style = ProgressBarStyle.Continuous;
                 _bar.Value = 0;
-                _step.Text = "Installation de PyTorch terminee.";
+                _step.Text = Lang.T("Installation de PyTorch terminee.");
                 _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = true;
                 _busy = false;
             });
@@ -1426,9 +1455,12 @@ internal sealed partial class MainForm : Form
     private void OnProfileChanged()
     {
         if (_busy || _profileBox == null) return;
-        string name = _profileBox.SelectedItem as string;
-        if (string.IsNullOrEmpty(name)) return;
-        SetProfile(name);
+        // Le texte affiche est traduit : on mappe l'index vers le nom interne
+        // du profil, seul nom utilise pour lire profil-<nom>.txt.
+        string[] internes = { "silence", "equilibre", "froid" };
+        int i = _profileBox.SelectedIndex;
+        if (i < 0 || i >= internes.Length) return;
+        SetProfile(internes[i]);
     }
 
     private void SetProfile(string name)
@@ -1478,9 +1510,10 @@ internal static class Program
             { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
             using (var p = Process.Start(psi))
             {
-                p.StandardOutput.ReadToEnd();
-                p.WaitForExit(8000);
-                missing = p.ExitCode != 0;
+                var so = p.StandardOutput.ReadToEndAsync();
+                var se = p.StandardError.ReadToEndAsync();
+                if (!p.WaitForExit(8000)) { try { p.Kill(); } catch { } missing = true; }
+                else missing = p.ExitCode != 0;
             }
 
             if (missing)
@@ -1506,18 +1539,35 @@ internal static class Program
             var psiPl = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
                 "--query-gpu=power.limit --format=csv,noheader,nounits")
             { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
+            int targetPl = 320;
+            try
+            {
+                string plFile = Path.Combine(root, "power-limit.txt");
+                if (File.Exists(plFile))
+                {
+                    var mp = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(plFile), @"(\d+)");
+                    if (mp.Success) targetPl = int.Parse(mp.Groups[1].Value);
+                }
+            }
+            catch { }
+
             using (var p = Process.Start(psiPl))
             {
-                string o = p.StandardOutput.ReadToEnd().Trim();
-                p.WaitForExit(8000);
-                double pl;
-                if (double.TryParse(o, System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out pl) && Math.Abs(pl - 320) > 1)
+                var so = p.StandardOutput.ReadToEndAsync();
+                if (!p.WaitForExit(8000)) { try { p.Kill(); } catch { } }
+                else
                 {
-                    var psiSet = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"), "-pl 320")
-                    { UseShellExecute = false, CreateNoWindow = true };
-                    using (var ps = Process.Start(psiSet)) ps.WaitForExit(15000);
-                    Log("power limit applique : 320 W");
+                    string o = so.Wait(2000) ? so.Result.Trim() : "";
+                    double pl;
+                    if (double.TryParse(o, System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out pl) && Math.Abs(pl - targetPl) > 1)
+                    {
+                        var psiSet = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "nvidia-smi.exe"),
+                            "-pl " + targetPl)
+                        { UseShellExecute = false, CreateNoWindow = true };
+                        using (var ps = Process.Start(psiSet)) ps.WaitForExit(15000);
+                        Log("power limit applique : " + targetPl + " W");
+                    }
                 }
             }
 
@@ -1526,8 +1576,9 @@ internal static class Program
             { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
             using (var p = Process.Start(psiSt))
             {
-                string o = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(10000);
+                var so = p.StandardOutput.ReadToEndAsync();
+                if (!p.WaitForExit(10000)) { try { p.Kill(); } catch { } }
+                string o = so.Wait(2000) ? so.Result : "";
                 if (o.Contains("Core curve offset: stock"))
                 {
                     var psiAp = new ProcessStartInfo(snu, "--in-tuning-file \"" + curve + "\" --no-persist")
@@ -1550,7 +1601,7 @@ internal static class Program
         Log("demarrage args=" + string.Join(" ", args) + " langue=" + Lang.Current);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false;
+        bool hidden = false, tune = false, check = false, report = false, freqTest = false, fanTest = false, packageTest = false, compareTest = false, applyTest = false;
         for (int i = 0; i < args.Length; i++)
         {
             string a = args[i];
@@ -1562,6 +1613,7 @@ internal static class Program
             if (a == "--fantest") fanTest = true;
             if (a == "--package") packageTest = true;
             if (a == "--compare") compareTest = true;
+            if (a == "--apply") applyTest = true;
             if (a == "--mhz" && i + 1 < args.Length)
             {
                 int v;
@@ -1592,6 +1644,17 @@ internal static class Program
                 if (fanTest) f.CliFanTest();
             }
             catch (Exception e) { Log("CLI test erreur : " + e.Message); }
+            return 0;
+        }
+
+        if (applyTest)
+        {
+            try
+            {
+                var af = new MainForm(true, false);
+                af.CliApply();
+            }
+            catch (Exception e) { Log("apply CLI " + e.Message); }
             return 0;
         }
 

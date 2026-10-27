@@ -125,11 +125,11 @@ internal sealed partial class MainForm
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect
         };
-        grid.Columns.Add("date", "Date");
+        grid.Columns.Add("date", Lang.T("Date"));
         grid.Columns.Add("mhz", "MHz");
         grid.Columns.Add("mv", "mV");
         grid.Columns.Add("pl", "Power limit");
-        grid.Columns.Add("profile", "Ventilation");
+        grid.Columns.Add("profile", Lang.T("Ventilation"));
 
         var lines = new List<string[]>();
         try
@@ -153,9 +153,9 @@ internal sealed partial class MainForm
         }
 
         var bar = new Panel { Dock = DockStyle.Bottom, Height = 44, BackColor = Color.FromArgb(28, 28, 28) };
-        var btnClose = new Button { Text = "Fermer", Location = new Point(610, 8), Size = new Size(100, 28) };
+        var btnClose = new Button { Text = Lang.T("Fermer"), Location = new Point(610, 8), Size = new Size(100, 28) };
         btnClose.Click += (o, e) => form.Close();
-        var btnRestore = new Button { Text = "Restaurer la selection", Location = new Point(400, 8), Size = new Size(200, 28) };
+        var btnRestore = new Button { Text = Lang.T("Restaurer la selection"), Location = new Point(400, 8), Size = new Size(200, 28) };
         btnRestore.Click += (o, e) =>
         {
             if (grid.SelectedRows.Count == 0) return;
@@ -394,7 +394,7 @@ internal sealed partial class MainForm
             {
                 LogMsg("DoPackage " + e);
                 RestoreActiveSafe();
-                Ui(() => { _step.Text = "Echec : " + e.Message + " (configuration restauree)"; });
+                Ui(() => { _step.Text = Lang.T("Echec : ") + e.Message + " (configuration restauree)"; });
             }
             finally
             {
@@ -417,7 +417,7 @@ internal sealed partial class MainForm
         if (py == null)
         {
             LogMsg("package : PyTorch requis et introuvable");
-            Ui(() => { _step.Text = "PyTorch est requis. Utilisez « Installer PyTorch »."; });
+            Ui(() => { _step.Text = Lang.T("PyTorch est requis. Utilisez « Installer PyTorch »."); });
             MessageBox.Show(
                 Lang.French
                     ? "La recherche de tension exige PyTorch (plus fiable qu'OpenCL).\n\n" +
@@ -431,7 +431,7 @@ internal sealed partial class MainForm
         var opti = new Dictionary<string, Measure>();
 
         // ---------- 1) ligne de base d'origine ----------
-        Ui(() => { _step.Text = "Ligne de base : configuration d'origine (4 charges)"; _bar.Value = 2; });
+        Ui(() => { _step.Text = Lang.T("Ligne de base : configuration d'origine (4 charges)"); _bar.Value = 2; });
         Ps("& '" + Path.Combine(Root, "snu.exe") + "' clear | Out-Null");
         Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + PlDefault + " | Out-Null");
         Thread.Sleep(3000);
@@ -446,7 +446,7 @@ internal sealed partial class MainForm
         }
 
         // ---------- 1bis) ventilation : test obligatoire apres l'origine ----------
-        Ui(() => { _step.Text = "Test obligatoire des profils de ventilation"; _bar.Value = 10; });
+        Ui(() => { _step.Text = Lang.T("Test obligatoire des profils de ventilation"); _bar.Value = 10; });
         string fanProfile = TestFanProfilesForPackage();
         _fanProfileChosen = fanProfile;
         LogMsg("package : profil de ventilation retenu " + fanProfile);
@@ -475,7 +475,7 @@ internal sealed partial class MainForm
         {
             LogMsg("package : moteur de test incomplet (python=" + (pyPath ?? "absent") +
                    ", stability.py=" + File.Exists(stab) + ")");
-            Ui(() => { _step.Text = "Moteur de test indisponible (PyTorch / stability.py)."; });
+            Ui(() => { _step.Text = Lang.T("Moteur de test indisponible (PyTorch / stability.py)."); });
             if (Environment.UserInteractive)
             MessageBox.Show(
                 (Lang.French
@@ -521,7 +521,7 @@ internal sealed partial class MainForm
                 foreach (int c in curve.Keys) if (c > mv && c < up) up = c;
                 string prop = up == int.MaxValue ? "aucune" : up + " mV";
                 LogMsg("package : tension imposee instable, valeur sure proposee " + prop);
-                Ui(() => { _step.Text = "Tension imposee instable - arret."; });
+                Ui(() => { _step.Text = Lang.T("Tension imposee instable - arret."); });
                 if (Environment.UserInteractive)
                     MessageBox.Show((Lang.French
                             ? "La tension de " + mv + " mV est instable.\n\nValeur sure proposee : " + prop + "."
@@ -769,7 +769,7 @@ internal sealed partial class MainForm
         // ---------- 6) rapport ----------
         AppendHistory(target, mvRetained, pl, _fanProfileChosen);
         WritePackageReport(stock, opti, target, mvRetained, pl, rows, firstFail);
-        Ui(() => { _bar.Value = 100; _step.Text = "Package optimal applique et verifie."; });
+        Ui(() => { _bar.Value = 100; _step.Text = Lang.T("Package optimal applique et verifie."); });
     }
 
     // ------------------------------------------------------------------

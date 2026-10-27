@@ -679,3 +679,68 @@ la restauration.
 Leçon : les régressions venaient de mon propre correctif précédent, pas du code
 d'origine. Toute modification du bouton « Appliquer » doit être suivie d'un
 contrôle de `history.txt` et de `power-limit.txt`.
+
+---
+
+## 19. Langue : audit exhaustif (v1.9.8 / 1.9.9)
+
+### 19.1 Pourquoi l'analyse tournait encore
+
+L'analyse complète avait été relancée après son interruption par un changement
+de langue (le bouton langue redémarrait l'application et tuait le test). Elle
+n'était **pas nécessaire** à la vérification des traductions : elle a été
+arrêtée et la configuration de référence rétablie (1845 MHz / 831 mV / 320 W).
+
+Le changement de langue est désormais **bloqué pendant un test**, avec un
+message explicite.
+
+### 19.2 Méthode d'audit
+
+Toutes les chaînes susceptibles d'être affichées sont extraites du code :
+
+```
+Text = "..."            Items.Add("...")        Columns.Add("id", "...")
+new ToolStripMenuItem("...")                    MessageBox.Show("...")
+```
+
+puis comparées au dictionnaire de `lang.cs`. Le script `tools/check-lang.py`
+fait aussi partie du build : un doublon de clé (qui provoquait un plantage au
+démarrage) **interrompt la compilation**.
+
+### 19.3 Résultat de l'audit
+
+| Étape | Chaînes non traduites |
+|---|---|
+| Avant audit | **32** |
+| Après audit | 4 faux positifs (noms de produit, `MHz`, `Min`, `Max`) |
+
+Catégories corrigées :
+
+- messages de la barre de progression (origine, ventilation, tension, package,
+  comparaison, restauration) ;
+- menu « Profil de ventilation » et ses entrées ;
+- colonnes des tableaux Historique et Capteurs ;
+- boutons de la fenêtre d'historique ;
+- notifications de mise à jour et d'épinglage ;
+- préfixes « Échec : », « Erreur : », « Terminé : », « Prêt. ».
+
+Le dictionnaire anglais passe de 90 à **128 clés**.
+
+### 19.4 Contrôles effectués
+
+```
+langue=fr  -> demarrage args=--tray langue=fr
+langue=de  -> demarrage args=--tray langue=de
+langue=en  -> demarrage args=--tray langue=en
+```
+
+Le fichier `language.txt` est lu au démarrage, quelle que soit la langue de
+Windows. Aucune erreur d'initialisation depuis la correction des doublons
+(la dernière datait de 01:21, avant le correctif).
+
+### 19.5 Bug de sélecteur corrigé
+
+Le ComboBox des profils affichait des libellés traduits mais les utilisait comme
+nom de fichier : choisir « quiet » en anglais cherchait `profil-quiet.txt` et
+échouait **silencieusement**. Le contrôle mappe désormais l'index vers le nom
+interne (`silence`, `equilibre`, `froid`).

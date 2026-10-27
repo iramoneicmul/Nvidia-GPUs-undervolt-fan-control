@@ -83,9 +83,13 @@ internal static class Compatibility
                 };
                 using (var p = Process.Start(psi))
                 {
-                    string o = p.StandardOutput.ReadToEnd();
-                    p.WaitForExit(8000);
-                    r.Curve = o.Contains("NVIDIA") && o.Contains("Core curve offset");
+                    var so = p.StandardOutput.ReadToEndAsync();
+                    if (!p.WaitForExit(8000)) { try { p.Kill(); } catch { } }
+                    else
+                    {
+                        string o = so.Wait(2000) ? so.Result : "";
+                        r.Curve = o.Contains("NVIDIA") && o.Contains("Core curve offset");
+                    }
                 }
             }
         }
@@ -102,8 +106,9 @@ internal static class Compatibility
             };
             using (var p = Process.Start(psi))
             {
-                string o = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(8000);
+                var so = p.StandardOutput.ReadToEndAsync();
+                if (!p.WaitForExit(8000)) { try { p.Kill(); } catch { } return r; }
+                string o = so.Wait(2000) ? so.Result : "";
                 var mn = Regex.Match(o, @"Min Power Limit\s*:\s*([\d.]+)");
                 var mx = Regex.Match(o, @"Max Power Limit\s*:\s*([\d.]+)");
                 if (mn.Success && mx.Success)

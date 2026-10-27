@@ -36,7 +36,7 @@ internal sealed partial class MainForm
         _busy = true;
         _btnApply.Enabled = _btnRestore.Enabled = _btnPersist.Enabled = false;
         _bar.Value = 0;
-        _step.Text = "Comparaison : preparation (~15 min)";
+        _step.Text = Lang.T("Comparaison : preparation (~15 min)");
 
         var th = new Thread(() =>
         {
@@ -45,7 +45,7 @@ internal sealed partial class MainForm
             {
                 LogMsg("RunComparison " + e);
                 RestoreActiveSafe();
-                Ui(() => { _step.Text = "Echec de la comparaison : " + e.Message + " (configuration restauree)"; });
+                Ui(() => { _step.Text = Lang.T("Echec de la comparaison : ") + e.Message + " (configuration restauree)"; });
             }
             finally
             {
@@ -66,7 +66,7 @@ internal sealed partial class MainForm
         if (py == null)
         {
             LogMsg("comparatif : PyTorch requis");
-            Ui(() => { _step.Text = "Comparaison impossible : PyTorch est requis."; });
+            Ui(() => { _step.Text = Lang.T("Comparaison impossible : PyTorch est requis."); });
             return;
         }
 

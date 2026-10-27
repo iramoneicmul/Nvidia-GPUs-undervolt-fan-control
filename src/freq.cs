@@ -36,7 +36,7 @@ internal sealed partial class MainForm
         var th = new Thread(() =>
         {
             try { DoMeasureFrequencies(); }
-            catch (Exception e) { LogMsg("FREQ FATAL " + e); Ui(() => { _step.Text = "Echec : " + e.Message; }); }
+            catch (Exception e) { LogMsg("FREQ FATAL " + e); Ui(() => { _step.Text = Lang.T("Echec : ") + e.Message; }); }
             finally
             {
                 Ui(() =>
@@ -54,7 +54,7 @@ internal sealed partial class MainForm
     private void DoMeasureFrequencies()
     {
         string py = ResolvePython();
-        if (py == null) { Ui(() => { _step.Text = "Python/PyTorch introuvable."; }); return; }
+        if (py == null) { Ui(() => { _step.Text = Lang.T("Python/PyTorch introuvable."); }); return; }
 
         var stock = new Dictionary<string, int>();
         var opti = new Dictionary<string, int>();
@@ -95,11 +95,11 @@ internal sealed partial class MainForm
         WriteFreqProfile(stock, opti);
 
         // --- 3) restaurer la configuration optimisee ---
-        Ui(() => { _step.Text = "Restauration de la configuration optimisee..."; });
+        Ui(() => { _step.Text = Lang.T("Restauration de la configuration optimisee..."); });
         ApplyTuning(Path.Combine(Root, "plateau-active.json"));
-        Ps("& nvidia-smi -pl 320 | Out-Null");
+        Ps("& nvidia-smi -pl " + DefaultPowerLimit + " | Out-Null");
 
-        Ui(() => { _bar.Value = 100; _step.Text = "Frequences mesurees et enregistrees."; });
+        Ui(() => { _bar.Value = 100; _step.Text = Lang.T("Frequences mesurees et enregistrees."); });
     }
 
     private int MeasureLevel(string py, int size)
