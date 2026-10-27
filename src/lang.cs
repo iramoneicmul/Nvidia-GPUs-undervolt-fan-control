@@ -52,6 +52,20 @@ internal static class Lang
     }
 
     /// <summary>Nom de profil de ventilation traduit.</summary>
+    /// <summary>Nom de niveau de charge traduit.</summary>
+    public static string Level(string lvl)
+    {
+        if (French || string.IsNullOrEmpty(lvl)) return lvl;
+        switch (lvl)
+        {
+            case "legere": return "light";
+            case "jeu": return "gaming";
+            case "soutenue": return "sustained";
+            case "lourde": return "heavy";
+            default: return lvl;
+        }
+    }
+
     public static string Profile(string profil)
     {
         if (French || string.IsNullOrEmpty(profil)) return profil;
@@ -170,6 +184,17 @@ internal static class Lang
         { "Termine : ", "Done: " },
         { "Pret.", "Ready." },
         { "Mise a jour ", "Update " },
+        { "Trouver la configuration optimale", "Find the optimal configuration" },
+        { "Tester les profils de ventilation", "Test fan profiles" },
+        { "Reappliquer au demarrage", "Reapply at startup" },
+        { "Mesurer les frequences", "Measure frequencies" },
+        { " tr/min", " rpm" }, { "tr/min", "rpm" },
+        { "legere", "light" }, { "jeu", "gaming" },
+        { "soutenue", "sustained" }, { "lourde", "heavy" },
+        { "Optimise", "Tuned" }, { "Origine", "Stock" },
+        { "Charge", "Load" }, { "Parametre", "Parameter" },
+        { "Resultat", "Result" }, { "Verdict", "Verdict" },
+        { "capteur;valeur;min;max", "sensor;value;min;max" },
         { "Silence", "Quiet" }, { "Equilibre", "Balanced" }, { "Froid", "Cool" },
     };
 

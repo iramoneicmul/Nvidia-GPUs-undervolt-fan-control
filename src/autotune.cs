@@ -422,19 +422,19 @@ internal sealed partial class MainForm
         {
             string path = Path.Combine(Root, "rapport-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".md");
             var sb = new StringBuilder();
-            sb.AppendLine("# Rapport d'optimisation - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+            sb.AppendLine((Lang.French ? "# Rapport d'optimisation - " : "# Optimisation report - ") + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
             sb.AppendLine();
             sb.AppendLine("Carte : " + _s.Name);
             sb.AppendLine();
-            sb.AppendLine("Frequence cible : " + TargetMhz + " MHz");
-            sb.AppendLine("Duree du test par palier : " + StabilitySeconds + " s");
+            sb.AppendLine((Lang.French ? "Frequence cible : " : "Target frequency: ") + TargetMhz + " MHz");
+            sb.AppendLine((Lang.French ? "Duree du test par palier : " : "Test duration per tier: ") + StabilitySeconds + " s");
             sb.AppendLine();
-            sb.AppendLine("| Tension | Resultat | Verdict |");
+            sb.AppendLine(Lang.French ? "| Tension | Resultat | Verdict |" : "| Voltage | Result | Verdict |");
             sb.AppendLine("|---|---|---|");
             foreach (string l in lines) sb.AppendLine(l);
             sb.AppendLine();
-            sb.AppendLine("Palier retenu (avec marge) : **" + retained + " mV**");
-            if (failed > 0) sb.AppendLine("Premier palier instable : " + failed + " mV");
+            sb.AppendLine((Lang.French ? "Palier retenu (avec marge) : **" : "Retained tier (with margin): **") + retained + " mV**");
+            if (failed > 0) sb.AppendLine((Lang.French ? "Premier palier instable : " : "First unstable tier: ") + failed + " mV");
             sb.AppendLine();
             sb.AppendLine(Lang.French ? "Power limit applique : " + DefaultPowerLimit + " W"
                                       : "Applied power limit: " + DefaultPowerLimit + " W");

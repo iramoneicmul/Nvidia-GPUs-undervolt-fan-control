@@ -953,18 +953,20 @@ internal sealed partial class MainForm
             var b = opti.ContainsKey(lvl) ? opti[lvl] : null;
             if (a == null || b == null) continue;
             sb.AppendLine(string.Format("| {0} | {1} | {2} | {3:+0;-0;0} | {4:+0.0;-0.0;0.0} | {5:+0;-0;0} |",
-                Cap(lvl), a.Line().Replace("|", " · "), b.Line().Replace("|", " · "),
+                Lang.French ? Cap(lvl) : (Lang.Level(lvl).Substring(0, 1).ToUpperInvariant() + Lang.Level(lvl).Substring(1)),
+                a.Line().Replace("|", " · "), b.Line().Replace("|", " · "),
                 b.Mhz - a.Mhz, b.Watts - a.Watts, b.TempGpu - a.TempGpu));
         }
 
         sb.AppendLine();
         sb.AppendLine(Lang.French ? "## Paliers de tension testes" : "## Voltage tiers tested");
         sb.AppendLine();
-        sb.AppendLine("| Tension | Resultat | Verdict |");
+        sb.AppendLine(Lang.French ? "| Tension | Resultat | Verdict |" : "| Voltage | Result | Verdict |");
         sb.AppendLine("|---|---|---|");
         foreach (string r in rows) sb.AppendLine(r);
         if (firstFail > 0) sb.AppendLine();
-        if (firstFail > 0) sb.AppendLine("Premier palier instable : " + firstFail + " mV");
+        if (firstFail > 0)
+            sb.AppendLine((Lang.French ? "Premier palier instable : " : "First unstable tier: ") + firstFail + " mV");
 
         try
         {

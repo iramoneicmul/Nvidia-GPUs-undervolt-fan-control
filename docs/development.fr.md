@@ -744,3 +744,62 @@ Le ComboBox des profils affichait des libellés traduits mais les utilisait comm
 nom de fichier : choisir « quiet » en anglais cherchait `profil-quiet.txt` et
 échouait **silencieusement**. Le contrôle mappe désormais l'index vers le nom
 interne (`silence`, `equilibre`, `froid`).
+
+---
+
+## 20. Langue : audit des boutons, charges et rapports (v1.9.10)
+
+### 20.1 Pourquoi les audits précédents échouaient
+
+Les scripts d'audit ne regardaient que les littéraux `Text = "..."` et
+`Items.Add("...")`. Ils ignoraient :
+
+- les chaînes passées à `MakeButton(...)` **absentes du dictionnaire** (elles
+  restaient en français, car `Lang.T` renvoie la chaîne d'origine si la clé
+  manque) ;
+- les tableaux `LevelNames` / `SensorNames` (clés internes affichées telles
+  quelles) ;
+- les rapports Markdown et HTML construits par `sb.AppendLine(...)` ;
+- l'unité `tr/min` et l'en-tête CSV.
+
+### 20.2 Méthode corrigée
+
+L'audit extrait désormais les arguments réels des fonctions d'affichage :
+`MakeButton`, `Section`, `AddTargetRow`, `Text =`, `Items.Add`,
+`Columns.Add`, `MessageBox.Show`, `_step.Text`, `sb.AppendLine`, plus les
+tableaux de noms. Chaque chaîne est confrontée au dictionnaire anglais.
+
+Résultat final : **3 chaînes signalées, toutes des faux positifs**
+(deux messages déjà traduits par `Lang.French`, un littéral `" rpm"`).
+
+### 20.3 Corrections
+
+| Élément | Avant | Après |
+|---|---|---|
+| Boutons | 4 restaient en français | traduits |
+| Noms de charges | `legere`, `jeu`, `soutenue`, `lourde` | `light`, `gaming`, `sustained`, `heavy` |
+| Unité ventilateur | `tr/min` | `rpm` |
+| Rapports | titres et en-têtes français | traduits |
+| CSV | `capteur;valeur;min;max` | `sensor;value;min;max` |
+
+Dictionnaire anglais : **145 clés**.
+
+### 20.4 Règle de repli
+
+```
+langue courante = fr   -> texte français (source)
+langue courante = de/es/it/pt -> dictionnaire de la langue
+                                  puis anglais si la clé manque
+                                  JAMAIS le français
+```
+
+Les quatre langues secondaires couvrent l'interface principale (77 clés) ; les
+messages additionnels (états, rapports) retombent sur l'anglais. Aucun texte
+français ne peut donc apparaître dans une interface non française, tant que la
+clé existe dans `En` — c'est ce que l'audit vérifie.
+
+### 20.5 Garde-fou
+
+`tools/check-lang.py` vérifie l'absence de doublons (qui plantaient au
+démarrage) et le build refuse de produire un MSI dans ce cas. L'audit des
+chaînes reste un script séparé, à relancer après toute modification d'interface.

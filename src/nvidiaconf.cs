@@ -1020,8 +1020,9 @@ internal sealed partial class MainForm : Form
 
     private static string FanText(int rpm, int pct)
     {
-        if (rpm > 0 && pct >= 0) return rpm + " tr/min  (" + pct + " %)";
-        if (rpm > 0) return rpm + " tr/min";
+        string unit = Lang.French ? " tr/min" : " rpm";
+        if (rpm > 0 && pct >= 0) return rpm + unit + "  (" + pct + " %)";
+        if (rpm > 0) return rpm + unit;
         if (pct >= 0) return pct + " %";
         return "n/a";
     }

@@ -189,15 +189,9 @@ internal sealed partial class MainForm
 
     private static string LevelName(string lvl)
     {
-        if (Lang.French) return lvl.Substring(0, 1).ToUpperInvariant() + lvl.Substring(1);
-        switch (lvl)
-        {
-            case "legere": return "Light";
-            case "jeu": return "Gaming";
-            case "soutenue": return "Sustained";
-            case "lourde": return "Heavy";
-            default: return lvl;
-        }
+        string t = Lang.Level(lvl);
+        if (t.Length == 0) return t;
+        return char.ToUpperInvariant(t[0]) + t.Substring(1);
     }
 
     private static string FmtMeasure(Measure m)
@@ -255,7 +249,7 @@ internal sealed partial class MainForm
 
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html><html lang=\"fr\"><head><meta charset=\"utf-8\">");
-        sb.AppendLine("<title>Rapport NVIDIA Configuration</title><style>");
+        sb.AppendLine("<title>" + B("Rapport NVIDIA Configuration", "NVIDIA Configuration report") + "</title><style>");
         sb.AppendLine("body{background:#181818;color:#ddd;font-family:Segoe UI,sans-serif;margin:24px}");
         sb.AppendLine("h1{color:#76b900;font-size:22px;margin-bottom:4px}");
         sb.AppendLine("h2{color:#9ad32a;font-size:16px;margin-top:26px;border-bottom:1px solid #333;padding-bottom:4px}");
@@ -267,7 +261,7 @@ internal sealed partial class MainForm
         sb.AppendLine(".meta{color:#888;font-size:12px}");
         sb.AppendLine("</style></head><body>");
 
-        sb.AppendLine("<h1>NVIDIA Configuration - rapport comparatif</h1>");
+        sb.AppendLine("<h1>NVIDIA Configuration - " + B("rapport comparatif", "comparison report") + "</h1>");
         sb.AppendLine("<div class=\"meta\">" + DateTime.Now.ToString("yyyy-MM-dd HH:mm") +
                       " &middot; " + _s.Name + " &middot; pilote " + _s.Driver + "</div>");
 
@@ -277,17 +271,17 @@ internal sealed partial class MainForm
         sb.AppendLine("<tr><td>" + B("Tension du plateau", "Plateau voltage") + "</td><td>" + Esc(_s.VoltPlateau) + "</td></tr>");
         sb.AppendLine("<tr><td>Power limit</td><td>" + _s.PowerLimit.ToString("0") + " W</td></tr>");
         sb.AppendLine("<tr><td>" + B("Profil de ventilation", "Fan profile") + "</td><td>" + Esc(Lang.Profile(_s.Profile)) + "</td></tr>");
-        sb.AppendLine("<tr><td>Moteur de test</td><td>" + Esc(_s.Torch) + " (PyTorch) / OpenCL integre</td></tr>");
+        sb.AppendLine("<tr><td>" + B("Moteur de test", "Test engine") + "</td><td>" + Esc(_s.Torch) + " (PyTorch) / " + B("OpenCL integre", "built-in OpenCL") + "</td></tr>");
         sb.AppendLine("</table>");
 
-        sb.AppendLine("<h2>Frequences moyennes par charge</h2>");
+        sb.AppendLine("<h2>" + B("Frequences moyennes par charge", "Average clocks by load") + "</h2>");
         if (stock.Count == 0 && opti.Count == 0)
         {
-            sb.AppendLine("<p>Aucune mesure disponible. Utilisez « Mesurer les frequences ».</p>");
+            sb.AppendLine("<p>" + B("Aucune mesure disponible. Utilisez « Mesurer les frequences ».", "No measurement available. Use \"Measure frequencies\".") + "</p>");
         }
         else
         {
-            sb.AppendLine("<table><tr><th>Charge</th><th>Origine</th><th>Optimise</th><th>Gain</th></tr>");
+            sb.AppendLine("<table><tr><th>" + B("Charge", "Load") + "</th><th>" + B("Origine", "Stock") + "</th><th>" + B("Optimise", "Tuned") + "</th><th>" + B("Gain", "Gain") + "</th></tr>");
             foreach (string lvl in new[] { "legere", "jeu", "soutenue", "lourde" })
             {
                 int a = stock.ContainsKey(lvl) ? stock[lvl] : 0;
