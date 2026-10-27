@@ -61,6 +61,234 @@ internal sealed partial class MainForm
     }
 
     // ------------------------------------------------------------------
+    //  Consignes saisies manuellement : lecture, validation, application
+    // ------------------------------------------------------------------
+    private bool ReadTargets(out int mhz, out int mv, out int pl, out string error, out int faulty)
+    {
+        mhz = mv = pl = 0;
+        error = null;
+        faulty = -1;
+
+        if (_targetMhzBox != null) int.TryParse(_targetMhzBox.Text.Trim(), out mhz);
+        if (_targetMvBox != null) int.TryParse(_targetMvBox.Text.Trim(), out mv);
+        if (_targetPlBox != null) int.TryParse(_targetPlBox.Text.Trim(), out pl);
+
+        int mhzMin, mhzMax, mvMin, mvMax, plMin, plMax;
+        ComputeTargetBounds(out mhzMin, out mhzMax, out mvMin, out mvMax, out plMin, out plMax);
+
+        if (mhz != 0 && (mhz < mhzMin || mhz > mhzMax))
+        {
+            faulty = 0;
+            error = string.Format(Lang.T("Frequence {0} MHz refusee : la carte accepte {1} a {2} MHz."),
+                mhz, mhzMin, mhzMax);
+        }
+        else if (mv != 0 && (mv < mvMin || mv > mvMax))
+        {
+            faulty = 1;
+            error = string.Format(Lang.T("Tension {0} mV refusee : la plage sure est {1} a {2} mV."),
+                mv, mvMin, mvMax);
+        }
+        else if (pl != 0 && (pl < plMin || pl > plMax))
+        {
+            faulty = 2;
+            error = string.Format(Lang.T("Power limit {0} W refuse : la carte accepte {1} a {2} W."),
+                pl, plMin, plMax);
+        }
+
+        return error == null;
+    }
+
+    private void ValidateTargetsLive()
+    {
+        if (_targetError == null) return;
+
+        int mhz, mv, pl, faulty;
+        string error;
+        ReadTargets(out mhz, out mv, out pl, out error, out faulty);
+
+        _targetError.Text = error ?? "";
+        _targetError.ForeColor = Color.FromArgb(230, 170, 90);
+
+        Color normal = Color.FromArgb(45, 45, 45);
+        Color bad = Color.FromArgb(90, 40, 40);
+        if (_targetMhzBox != null) _targetMhzBox.BackColor = faulty == 0 ? bad : normal;
+        if (_targetMvBox != null) _targetMvBox.BackColor = faulty == 1 ? bad : normal;
+        if (_targetPlBox != null) _targetPlBox.BackColor = faulty == 2 ? bad : normal;
+    }
+
+    // Application d'un seul champ : 0 = frequence, 1 = tension, 2 = power limit.
+    private void ApplyTargetField(int which)
+    {
+        int mhz, mv, pl, faulty;
+        string error;
+        if (!ReadTargets(out mhz, out mv, out pl, out error, out faulty))
+        {
+            LogMsg("application refusee : " + error);
+            if (Environment.UserInteractive)
+                MessageBox.Show(error, Lang.T("Valeur hors limites"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ValidateTargetsLive();
+            return;
+        }
+
+        int curMhz, curMv;
+        ReadActivePoint(out curMhz, out curMv);
+
+        int useMhz = mhz > 0 ? mhz : curMhz;
+        int useMv = mv > 0 ? mv : curMv;
+        string titre = Lang.T("Application manuelle");
+
+        if (which == 0 && mhz == 0)
+        {
+            MessageBox.Show(Lang.T("Saisissez une frequence avant d'appliquer."), titre,
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (which == 1 && mv == 0)
+        {
+            MessageBox.Show(Lang.T("Saisissez une tension avant d'appliquer."), titre,
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        if (which == 2 && pl == 0)
+        {
+            MessageBox.Show(Lang.T("Saisissez un power limit avant d'appliquer."), titre,
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (which != 2 && useMv <= 0)
+        {
+            MessageBox.Show(Lang.T("Aucune tension connue : renseignez la tension cible."), titre,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (which != 2 && useMhz <= 0)
+        {
+            MessageBox.Show(Lang.T("Aucune frequence connue : renseignez la frequence cible."), titre,
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        string resume = which == 2
+            ? pl + " W"
+            : useMhz + " MHz / " + useMv + " mV";
+
+        if (MessageBox.Show(
+            string.Format(Lang.T("Appliquer {0} ?\n\nCes valeurs n'ont pas ete validees par un test de stabilite."), resume),
+            titre, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            return;
+
+        try
+        {
+            if (which == 2)
+            {
+                Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + pl + " | Out-Null");
+                try { File.WriteAllText(Path.Combine(Root, "power-limit.txt"), pl + " W\n"); } catch { }
+                LogMsg("application manuelle : power limit " + pl + " W");
+                AppendHistory(curMhz, curMv, pl, _s.Profile ?? "equilibre");
+            }
+            else
+            {
+                var curve = ReadStockCurve();
+                TargetMhz = useMhz;
+                WritePlateauNamed(useMv, curve, Path.Combine(Root, "plateau-active.json"));
+                ApplyTuning(Path.Combine(Root, "plateau-active.json"));
+                LogMsg("application manuelle : courbe " + useMhz + " MHz / " + useMv + " mV");
+                AppendHistory(useMhz, useMv, pl > 0 ? pl : (int)Math.Round(_s.PowerLimit), _s.Profile ?? "equilibre");
+            }
+
+            MessageBox.Show(
+                (Lang.French ? "Applique : " : "Applied: ") + resume +
+                (Lang.French ? "\n\nNon valide : utilisez « Determiner le package optimal » pour tester."
+                             : "\n\nNot validated: use \"Find optimal package\" to test."),
+                titre, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception e)
+        {
+            LogMsg("application manuelle : echec " + e.Message);
+            MessageBox.Show(e.Message, titre, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        Refresh(true);
+    }
+
+    private void ApplyTargets()
+    {
+        int mhz, mv, pl, faulty;
+        string error;
+        if (!ReadTargets(out mhz, out mv, out pl, out error, out faulty))
+        {
+            LogMsg("application manuelle refusee : " + error);
+            if (Environment.UserInteractive)
+                MessageBox.Show(error, Lang.T("Valeur hors limites"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            ValidateTargetsLive();
+            return;
+        }
+
+        if (mv == 0 && pl == 0)
+        {
+            string msg = Lang.French
+                ? "Indiquez au moins une tension ou un power limit.\n\nUne frequence seule n'a pas de sens : elle doit etre associee a une tension."
+                : "Enter at least a voltage or a power limit.\n\nA frequency alone is meaningless: it must go with a voltage.";
+            LogMsg("application manuelle : aucune consigne exploitable");
+            MessageBox.Show(msg, Lang.T("Valeur hors limites"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        string resume = (mhz > 0 ? mhz + " MHz" : (Lang.French ? "frequence inchangee" : "frequency unchanged"))
+            + " / " + (mv > 0 ? mv + " mV" : (Lang.French ? "tension inchangee" : "voltage unchanged"))
+            + " / " + (pl > 0 ? pl + " W" : (Lang.French ? "power limit inchange" : "power limit unchanged"));
+
+        if (MessageBox.Show(
+            (Lang.French ? "Appliquer ces valeurs ?\n\n" : "Apply these values?\n\n") + resume +
+            (Lang.French
+                ? "\n\nElles n'ont pas ete validees par un test de stabilite."
+                : "\n\nThey have not been validated by a stability test."),
+            Lang.French ? "Application manuelle" : "Manual apply",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            return;
+
+        try
+        {
+            if (mv > 0)
+            {
+                var curve = ReadStockCurve();
+                if (mhz > 0) TargetMhz = mhz;
+                else if (TargetMhz <= 0) TargetMhz = 1845;
+
+                WritePlateauNamed(mv, curve, Path.Combine(Root, "plateau-active.json"));
+                ApplyTuning(Path.Combine(Root, "plateau-active.json"));
+                LogMsg("application manuelle : courbe " + TargetMhz + " MHz / " + mv + " mV");
+            }
+
+            if (pl > 0)
+            {
+                Ps("& '" + Environment.SystemDirectory + "\\nvidia-smi.exe' -pl " + pl + " | Out-Null");
+                try { File.WriteAllText(Path.Combine(Root, "power-limit.txt"), pl + " W\n"); } catch { }
+                LogMsg("application manuelle : power limit " + pl + " W");
+            }
+
+            int histMhz = mhz > 0 ? mhz : TargetMhz;
+            AppendHistory(histMhz, mv, pl > 0 ? pl : (int)Math.Round(_s.PowerLimit), _s.Profile ?? "equilibre");
+
+            MessageBox.Show(
+                (Lang.French
+                    ? "Valeurs appliquees.\n\nElles ne sont pas validees : utilisez « Determiner le package optimal » pour un test de stabilite."
+                    : "Values applied.\n\nThey are not validated: use \"Find optimal package\" for a stability test."),
+                Lang.French ? "Application manuelle" : "Manual apply",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception e)
+        {
+            LogMsg("application manuelle : echec " + e.Message);
+            MessageBox.Show(e.Message, Lang.French ? "Application manuelle" : "Manual apply",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
+        Refresh(true);
+    }
+
+    // ------------------------------------------------------------------
     //  Bornes de saisie, deduites des caracteristiques de la carte
     // ------------------------------------------------------------------
     // Sauvegarde horodatee de la configuration courante avant chaque test.

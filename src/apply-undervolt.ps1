@@ -78,7 +78,14 @@ if (-not $applied) { Fail-Fatal 'Application de la courbe impossible apres 3 ten
 #    320 W est le reglage retenu : en jeu la consommation reste sous cette
 #    limite (la carte garde sa frequence), tandis que les charges lourdes
 #    sont plafonnees et chauffent nettement moins.
+# Power limit memorise par nvidiaconf (boutons d'application ou assistant).
+# Repli sur 320 W si le fichier est absent.
 $PowerLimitW = 320
+$plFile = Join-Path $Root 'power-limit.txt'
+if (Test-Path $plFile) {
+    $mpl = [regex]::Match((Get-Content $plFile -Raw), '(\d+)')
+    if ($mpl.Success) { $PowerLimitW = [int]$mpl.Groups[1].Value }
+}
 if ($PowerLimitW -gt 0) {
     try {
         $pl = & nvidia-smi -pl $PowerLimitW 2>&1 | Out-String

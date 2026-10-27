@@ -899,3 +899,64 @@ dessus. **L'utilisateur choisit ensuite** librement parmi les trois courbes.
 - Le calcul suppose que la puissance dissipée reste celle de la configuration
   courante ; changer de tension ou de power limit justifie une nouvelle
   optimisation.
+
+---
+
+## 23. Application manuelle et persistance (v1.12.0 → 1.12.3)
+
+### 23.1 Boutons d'application
+
+| Élément | Emplacement | Effet |
+|---|---|---|
+| **Appliquer** (fréquence) | ligne fréquence | écrit la courbe à cette fréquence, avec la tension saisie ou la tension active |
+| **Appliquer** (tension) | ligne tension | écrit la courbe à cette tension, avec la fréquence saisie ou la fréquence active |
+| **Appliquer** (power limit) | ligne power limit | applique le PL seul |
+| **Appliquer ces valeurs** | sous les champs | applique les trois d'un coup |
+
+Chaque application :
+1. valide la ou les valeurs ;
+2. demande confirmation en rappelant que **ce n'est pas validé** ;
+3. écrit `plateau-active.json` et/ou `power-limit.txt` ;
+4. ajoute une entrée à `history.txt` ;
+5. rafraîchit l'interface.
+
+### 23.2 Validation immédiate
+
+`ReadTargets()` renvoie le champ fautif et un message chiffré :
+
+```
+Frequence 5000 MHz refusee : la carte accepte 500 a 2100 MHz.
+Tension 400 mV refusee : la plage sure est 700 a 1000 mV.
+Power limit 400 W refuse : la carte accepte 100 a 350 W.
+```
+
+Le champ concerné passe en **rouge** dès la saisie (`ValidateTargetsLive`), et le
+message apparaît sous les champs, sans attendre le lancement d'un test.
+
+### 23.3 Persistance au démarrage
+
+**Bug corrigé** : `apply-undervolt.ps1` forçait `$PowerLimitW = 320`. Les valeurs
+saisies manuellement n'étaient donc pas réappliquées.
+
+Le script lit désormais :
+
+```powershell
+$PowerLimitW = 320
+$plFile = Join-Path $Root 'power-limit.txt'
+if (Test-Path $plFile) {
+    $mpl = [regex]::Match((Get-Content $plFile -Raw), '(\d+)')
+    if ($mpl.Success) { $PowerLimitW = [int]$mpl.Groups[1].Value }
+}
+```
+
+La courbe venait déjà de `plateau-active.json`. Les deux valeurs manuelles
+(fréquence/tension et power limit) sont donc bien réappliquées.
+
+**Test réalisé** : `power-limit.txt = 310 W` → le script applique **310 W**.
+Valeur ensuite restaurée à 320 W.
+
+### 23.4 Traductions
+
+Les messages de cette fonctionnalité existent dans les **cinq langues**
+(165 clés par langue) : erreurs de plage, confirmations, avertissements. Le
+build vérifie la parité et l'absence de doublon.

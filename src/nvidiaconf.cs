@@ -294,6 +294,7 @@ internal sealed partial class MainForm : Form
     private TextBox _targetPlBox;
     private Label _boundsLabel;
     private Label _lblLanguage;
+    private Label _targetError;
     private MiniGraph _graph;
     private bool _tempAlert;
     public static int RequestedMv;
@@ -576,9 +577,12 @@ internal sealed partial class MainForm : Form
             "Undervolt", "Power limit", "Profil ventilation", "Courbe 831 mV"
         });
 
-        _targetMhzBox = AddTargetRow(tConf, "Frequence cible (MHz) :", y3 + 10, "(0 = deduite de l'origine)");
-        _targetMvBox = AddTargetRow(tConf, "Tension cible (mV) :", y3 + 36, "(0 = recherche automatique)");
-        _targetPlBox = AddTargetRow(tConf, "Power limit max (W) :", y3 + 62, "(0 = consomme + 10 W)");
+        _targetMhzBox = AddTargetRow(tConf, "Frequence cible (MHz) :", y3 + 10,
+            "(0 = deduite de l'origine)", () => ApplyTargetField(0));
+        _targetMvBox = AddTargetRow(tConf, "Tension cible (mV) :", y3 + 36,
+            "(0 = recherche automatique)", () => ApplyTargetField(1));
+        _targetPlBox = AddTargetRow(tConf, "Power limit max (W) :", y3 + 62,
+            "(0 = consomme + 10 W)", () => ApplyTargetField(2));
 
         _boundsLabel = new Label
         {
@@ -590,9 +594,28 @@ internal sealed partial class MainForm : Form
         };
         tConf.Controls.Add(_boundsLabel);
 
-        var btnPackage = MakeButton("Determiner le package optimal", 18, y3 + 128, 260);
+        _targetError = new Label
+        {
+            ForeColor = Color.FromArgb(230, 170, 90),
+            AutoSize = false,
+            Size = new Size(520, 32),
+            Location = new Point(18, y3 + 90 + 32)
+        };
+        tConf.Controls.Add(_targetError);
+
+        var btnApplyTargets = MakeButton("Appliquer ces valeurs", 18, y3 + 128, 260);
+        btnApplyTargets.Click += (o, e) => ApplyTargets();
+        tConf.Controls.Add(btnApplyTargets);
+
+        var btnPackage = MakeButton("Determiner le package optimal", 288, y3 + 128, 250);
         btnPackage.Click += (o, e) => PackageButton();
         tConf.Controls.Add(btnPackage);
+
+        // validation en temps reel : message et couleur des le changement
+        EventHandler live = (o, e) => ValidateTargetsLive();
+        _targetMhzBox.TextChanged += live;
+        _targetMvBox.TextChanged += live;
+        _targetPlBox.TextChanged += live;
 
         var btnReport = MakeButton("Ouvrir le rapport comparatif", 18, y3 + 164, 260);
         btnReport.Click += (o, e) => OpenComparativeReport();
@@ -655,7 +678,7 @@ internal sealed partial class MainForm : Form
     }
 
     // Ligne de saisie : libelle, zone de texte, aide. Retourne la zone de texte.
-    private TextBox AddTargetRow(TabPage page, string label, int y, string hint)
+    private TextBox AddTargetRow(TabPage page, string label, int y, string hint, Action apply = null)
     {
         var lbl = new Label
         {
@@ -689,6 +712,23 @@ internal sealed partial class MainForm : Form
             Location = new Point(238, y)
         };
         page.Controls.Add(help);
+
+        if (apply != null)
+        {
+            var btn = new Button
+            {
+                Tag = "Appliquer",
+                Text = Lang.T("Appliquer"),
+                Location = new Point(434, y - 5),
+                Size = new Size(110, 25),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(45, 45, 45),
+                ForeColor = Color.Gainsboro
+            };
+            btn.FlatAppearance.BorderColor = Color.FromArgb(118, 185, 0);
+            btn.Click += (o, e) => apply();
+            page.Controls.Add(btn);
+        }
         return box;
     }
 
