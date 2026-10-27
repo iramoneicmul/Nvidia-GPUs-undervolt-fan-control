@@ -293,6 +293,7 @@ internal sealed partial class MainForm : Form
     private TextBox _targetMvBox;
     private TextBox _targetPlBox;
     private Label _boundsLabel;
+    private Label _lblLanguage;
     private MiniGraph _graph;
     private bool _tempAlert;
     public static int RequestedMv;
@@ -327,20 +328,31 @@ internal sealed partial class MainForm : Form
         _tray.Text = "NVIDIA Configuration";
 
         var menu = new ContextMenuStrip();
-        menu.Items.Add(Lang.T("Afficher"), null, (o, e) => { Show(); WindowState = FormWindowState.Normal; Activate(); });
-        menu.Items.Add(Lang.T("Actualiser"), null, (o, e) => Refresh(true));
+
+        menu.Items.Add(TrayItem("Afficher", (o, e) => { Show(); WindowState = FormWindowState.Normal; Activate(); }));
+        menu.Items.Add(TrayItem("Actualiser", (o, e) => Refresh(true)));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Lang.T("Appliquer la configuration"), null, (o, e) => RunScript("apply-undervolt.ps1"));
+        menu.Items.Add(TrayItem("Appliquer la configuration", (o, e) => RunScript("apply-undervolt.ps1")));
+
         var prof = new ToolStripMenuItem(Lang.T("Profil de ventilation"));
-        prof.DropDownItems.Add(Lang.T("Silence"), null, (o, e) => SetProfile("silence"));
-        prof.DropDownItems.Add(Lang.T("Equilibre"), null, (o, e) => SetProfile("equilibre"));
-        prof.DropDownItems.Add(Lang.T("Froid"), null, (o, e) => SetProfile("froid"));
+        prof.Tag = "Profil de ventilation";
+        var pSil = new ToolStripMenuItem(Lang.T("Silence")); pSil.Tag = "Silence";
+        pSil.Click += (o, e) => SetProfile("silence");
+        var pEqu = new ToolStripMenuItem(Lang.T("Equilibre")); pEqu.Tag = "Equilibre";
+        pEqu.Click += (o, e) => SetProfile("equilibre");
+        var pFro = new ToolStripMenuItem(Lang.T("Froid")); pFro.Tag = "Froid";
+        pFro.Click += (o, e) => SetProfile("froid");
+        prof.DropDownItems.Add(pSil);
+        prof.DropDownItems.Add(pEqu);
+        prof.DropDownItems.Add(pFro);
         menu.Items.Add(prof);
+
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(Lang.T("Epingler l'icone dans la barre"), null, (o, e) => PromoteTrayIcon());
-        menu.Items.Add(Lang.T("Rapport comparatif"), null, (o, e) => OpenComparativeReport());
-        menu.Items.Add(Lang.T("Ouvrir le dossier"), null, (o, e) => Process.Start("explorer.exe", Root));
-        menu.Items.Add(Lang.T("Quitter"), null, (o, e) => { _tray.Visible = false; Application.Exit(); });
+        menu.Items.Add(TrayItem("Epingler l'icone dans la barre", (o, e) => PromoteTrayIcon()));
+        menu.Items.Add(TrayItem("Rapport comparatif", (o, e) => OpenComparativeReport()));
+        menu.Items.Add(TrayItem("Ouvrir le dossier", (o, e) => Process.Start("explorer.exe", Root)));
+        menu.Items.Add(TrayItem("Quitter", (o, e) => { _tray.Visible = false; Application.Exit(); }));
+
         _tray.ContextMenuStrip = menu;
         _tray.MouseClick += (o, e) =>
         {
@@ -503,12 +515,12 @@ internal sealed partial class MainForm : Form
             Font = new Font("Segoe UI", 9f)
         };
 
-        var tIdent = new TabPage(Lang.T("Identite")) { BackColor = Color.FromArgb(24, 24, 24) };
-        var tFreq = new TabPage(Lang.T("Frequences")) { BackColor = Color.FromArgb(24, 24, 24) };
-        var tConf = new TabPage(Lang.T("Configuration")) { BackColor = Color.FromArgb(24, 24, 24) };
-        var tLive = new TabPage(Lang.T("Temps reel")) { BackColor = Color.FromArgb(24, 24, 24) };
-        var tSensors = new TabPage(Lang.T("Capteurs")) { BackColor = Color.FromArgb(24, 24, 24) };
-        var tReport = new TabPage(Lang.T("Rapport")) { BackColor = Color.FromArgb(24, 24, 24) };
+        var tIdent = new TabPage(Lang.T("Identite")) { Tag = "Identite", BackColor = Color.FromArgb(24, 24, 24) };
+        var tFreq = new TabPage(Lang.T("Frequences")) { Tag = "Frequences", BackColor = Color.FromArgb(24, 24, 24) };
+        var tConf = new TabPage(Lang.T("Configuration")) { Tag = "Configuration", BackColor = Color.FromArgb(24, 24, 24) };
+        var tLive = new TabPage(Lang.T("Temps reel")) { Tag = "Temps reel", BackColor = Color.FromArgb(24, 24, 24) };
+        var tSensors = new TabPage(Lang.T("Capteurs")) { Tag = "Capteurs", BackColor = Color.FromArgb(24, 24, 24) };
+        var tReport = new TabPage(Lang.T("Rapport")) { Tag = "Rapport", BackColor = Color.FromArgb(24, 24, 24) };
 
         tabs.TabPages.AddRange(new TabPage[] { tIdent, tFreq, tConf, tLive, tSensors, tReport });
         Controls.Add(tabs);
@@ -525,7 +537,7 @@ internal sealed partial class MainForm : Form
         });
 
         int yLang = y1 + 70;
-        var lblLang = new Label
+        _lblLanguage = new Label
         {
             Text = Lang.T("Langue") + " : " + Lang.Names[Lang.IndexOf(Lang.Current)],
             ForeColor = Color.Silver,
@@ -533,7 +545,7 @@ internal sealed partial class MainForm : Form
             Size = new Size(320, 18),
             Location = new Point(18, yLang)
         };
-        tIdent.Controls.Add(lblLang);
+        tIdent.Controls.Add(_lblLanguage);
 
         var btnLang = MakeButton("Langue", 18, yLang + 24, 140);
         btnLang.Click += (o, e) => ChooseLanguage(btnLang);
@@ -647,6 +659,7 @@ internal sealed partial class MainForm : Form
     {
         var lbl = new Label
         {
+            Tag = label,
             Text = Lang.T(label),
             ForeColor = Color.Silver,
             AutoSize = false,
@@ -668,6 +681,7 @@ internal sealed partial class MainForm : Form
 
         var help = new Label
         {
+            Tag = hint,
             Text = Lang.T(hint),
             ForeColor = Color.Gray,
             AutoSize = false,
@@ -682,6 +696,7 @@ internal sealed partial class MainForm : Form
     {
         var b = new Button
         {
+            Tag = text,
             Text = Lang.T(text),
             Location = new Point(x, y),
             Size = new Size(w, 28),
@@ -795,7 +810,67 @@ internal sealed partial class MainForm : Form
         catch { }
     }
 
-    // Choix de la langue : menu, enregistrement, redemarrage de l'application.
+    private ToolStripMenuItem TrayItem(string fr, EventHandler onClick)
+    {
+        var it = new ToolStripMenuItem(Lang.T(fr));
+        it.Tag = fr;
+        it.Click += onClick;
+        return it;
+    }
+
+    // Retraduit toute l'interface en place, sans redemarrer l'application.
+    private void RetranslateAll()
+    {
+        RetranslateControl(this);
+
+        if (_tray != null && _tray.ContextMenuStrip != null)
+            RetranslateItems(_tray.ContextMenuStrip.Items);
+
+        if (_boundsLabel != null) UpdateTargetBounds();
+
+        // profils de ventilation : libelles traduits, index conserve
+        if (_profileBox != null)
+        {
+            int idx = _profileBox.SelectedIndex;
+            _profileBox.Items.Clear();
+            _profileBox.Items.AddRange(new object[]
+            {
+                Lang.T("silence"), "equilibre", Lang.T("froid")
+            });
+            if (idx >= 0) _profileBox.SelectedIndex = idx;
+        }
+
+        if (_lblLanguage != null)
+            _lblLanguage.Text = Lang.T("Langue") + " : " +
+                Lang.Names[Lang.IndexOf(Lang.Current)];
+    }
+
+    private void RetranslateControl(Control root)
+    {
+        foreach (Control c in root.Controls)
+        {
+            if (c.Tag is string) c.Text = Lang.T((string)c.Tag);
+            if (c is DataGridView)
+            {
+                var g = (DataGridView)c;
+                foreach (DataGridViewColumn col in g.Columns)
+                    if (col.Tag is string) col.HeaderText = Lang.T((string)col.Tag);
+            }
+            RetranslateControl(c);
+        }
+    }
+
+    private void RetranslateItems(ToolStripItemCollection items)
+    {
+        foreach (ToolStripItem it in items)
+        {
+            if (it.Tag is string) it.Text = Lang.T((string)it.Tag);
+            var mi = it as ToolStripMenuItem;
+            if (mi != null) RetranslateItems(mi.DropDownItems);
+        }
+    }
+
+    // Choix de la langue : menu, application immediate sans redemarrage.
     private void ChooseLanguage(Control anchor)
     {
         var menu = new ContextMenuStrip();
@@ -820,17 +895,11 @@ internal sealed partial class MainForm : Form
                 Lang.T("Langue"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+
         Lang.Set(code);
         LogMsg("langue : " + code);
-        try
-        {
-            // Relance differee : l'instance courante doit liberer son mutex.
-            Process.Start(new ProcessStartInfo("cmd.exe",
-                "/c timeout /t 2 >nul & start \"\" \"" + Application.ExecutablePath + "\" --tray")
-            { CreateNoWindow = true, UseShellExecute = false });
-        }
-        catch { }
-        Application.Exit();
+        RetranslateAll();
+        Refresh(true);
     }
 
     private void Ui(Action a)
@@ -997,6 +1066,7 @@ internal sealed partial class MainForm : Form
     {
         var box = new GroupBox
         {
+            Tag = title,
             Text = Lang.T(title),
             ForeColor = Color.FromArgb(150, 200, 60),
             Location = new Point(14, y),
@@ -1007,7 +1077,7 @@ internal sealed partial class MainForm : Form
         int ky = 20;
         foreach (string k in keys)
         {
-            var lk = new Label { Text = Lang.T(k), ForeColor = Color.Gray, AutoSize = false, Size = new Size(210, 17), Location = new Point(12, ky) };
+            var lk = new Label { Tag = k, Text = Lang.T(k), ForeColor = Color.Gray, AutoSize = false, Size = new Size(210, 17), Location = new Point(12, ky) };
             var lv = new Label { Text = "-", ForeColor = Color.WhiteSmoke, AutoSize = false, Size = new Size(290, 17), Location = new Point(226, ky), TextAlign = ContentAlignment.MiddleRight };
             box.Controls.Add(lk);
             box.Controls.Add(lv);

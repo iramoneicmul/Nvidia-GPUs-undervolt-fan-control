@@ -125,11 +125,11 @@ internal sealed partial class MainForm
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect
         };
-        grid.Columns.Add("date", Lang.T("Date"));
+        grid.Columns.Add("date", Lang.T("Date")); grid.Columns[0].Tag = "Date";
         grid.Columns.Add("mhz", "MHz");
         grid.Columns.Add("mv", "mV");
         grid.Columns.Add("pl", "Power limit");
-        grid.Columns.Add("profile", Lang.T("Ventilation"));
+        grid.Columns.Add("profile", Lang.T("Ventilation")); grid.Columns[4].Tag = "Ventilation";
 
         var lines = new List<string[]>();
         try

@@ -803,3 +803,38 @@ clé existe dans `En` — c'est ce que l'audit vérifie.
 `tools/check-lang.py` vérifie l'absence de doublons (qui plantaient au
 démarrage) et le build refuse de produire un MSI dans ce cas. L'audit des
 chaînes reste un script séparé, à relancer après toute modification d'interface.
+
+---
+
+## 21. Bouton « Tester les profils de ventilation » (v1.10.1)
+
+### 21.1 Ce qu'il fait
+
+Pour chacun des trois profils (`silence`, `equilibre`, `froid`) :
+
+1. copie `profil-<nom>.txt` vers `fan-curve.txt` (le service applique) ;
+2. attend 4 s, puis lance une charge de **70 s** (PyTorch 2048 depuis 1.10.1) ;
+3. attend 15 s de montée en régime ;
+4. échantillonne toutes les 2 s : régime (NVAPI), température GPU et mémoire ;
+5. pause de 5 s, profil suivant ;
+6. écrit `C:\Nvidia\rapport-ventilation-AAAAMMJJ-HHMMSS.md` ;
+7. restaure le profil actif avant le test.
+
+Durée totale : environ **5 minutes**. Le bouton **mesure**, il ne produit aucun
+verdict : c'est à l'utilisateur de comparer bruit et températures.
+
+### 21.2 Défauts corrigés
+
+| Défaut | Conséquence | Correction |
+|---|---|---|
+| charge **OpenCL** | ~240 W au lieu de ~320 W : test thermique peu représentatif | charge **PyTorch** (repli OpenCL si absent) |
+| `int rpm = SmiInt("fan.speed")` | variable jamais utilisée, et `fan.speed` est un pourcentage | code mort supprimé |
+| retour **codé en dur** à `equilibre` | écrasait le profil choisi par l'utilisateur | profil actif mémorisé puis restauré |
+| rapport en français, unité `tr/min` | incohérent en interface anglaise | traduit, unité `rpm` |
+| moyenne à `0 tr/min` si NVAPI échoue | résultat trompeur | affichage « - » |
+
+### 21.3 Ce que le test ne fait pas
+
+- Il ne choisit pas de profil : l'assistant d'optimisation, lui, teste puis
+  **retient** le plus silencieux qui tient le seuil (`TestFanProfilesForPackage`).
+- Il ne compare pas avec la configuration d'origine.

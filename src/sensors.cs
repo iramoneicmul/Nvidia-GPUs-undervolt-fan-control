@@ -285,11 +285,28 @@ internal sealed partial class MainForm
     private void DoTestFanProfiles()
     {
         string[] profils = { "silence", "equilibre", "froid" };
+
+        // Profil actif avant le test : il sera restaure a la fin.
+        string previous = "equilibre";
+        try
+        {
+            string cur = File.ReadAllText(Path.Combine(Root, "fan-curve.txt"));
+            if (cur.Contains("SILENCE")) previous = "silence";
+            else if (cur.Contains("FROID")) previous = "froid";
+        }
+        catch { }
+
         var rapport = new StringBuilder();
-        rapport.AppendLine("# Test des profils de ventilation - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+        rapport.AppendLine("# " + (Lang.French ? "Test des profils de ventilation - " : "Fan profile test - ") +
+                           DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
         rapport.AppendLine();
-        rapport.AppendLine("| Profil | Regime moyen | Regime max | GPU max | Memoire max |");
+        rapport.AppendLine(Lang.French
+            ? "| Profil | Regime moyen | Regime max | GPU max | Memoire max |"
+            : "| Profile | Average speed | Max speed | Max GPU | Max memory |");
         rapport.AppendLine("|---|---|---|---|---|");
+
+        string py = ResolvePython();
+        string unit = Lang.French ? " tr/min" : " rpm";
 
         for (int p = 0; p < profils.Length; p++)
         {
@@ -297,7 +314,9 @@ internal sealed partial class MainForm
             int idx = p;
             Ui(() =>
             {
-                _step.Text = string.Format("Test du profil {0} ({1}/3) - charge 1 min", profil, idx + 1);
+                _step.Text = string.Format(Lang.French
+                    ? "Test du profil {0} ({1}/3) - charge 70 s"
+                    : "Testing profile {0} ({1}/3) - 70 s load", profil, idx + 1);
                 _bar.Value = (int)(100.0 * idx / 3);
             });
 
@@ -310,20 +329,41 @@ internal sealed partial class MainForm
             Thread.Sleep(4000);
 
             long sumRpm = 0; int n = 0, maxRpm = 0, maxGpu = 0, maxMem = 0;
-            var sw = Stopwatch.StartNew();
-            var load = new Thread(() => { OpenClTest.Run(70, 2048, null); });
+
+            // Charge PyTorch si disponible (meme severite que l'assistant),
+            // sinon repli OpenCL.
+            Thread load;
+            if (py != null)
+            {
+                load = new Thread(() =>
+                {
+                    try
+                    {
+                        var psi = new ProcessStartInfo(py,
+                            "\"C:\\Nvidia\\stress-long.py\" 70 2048")
+                        { UseShellExecute = false, CreateNoWindow = true };
+                        using (var proc = Process.Start(psi))
+                            proc.WaitForExit(100000);
+                    }
+                    catch { }
+                });
+            }
+            else
+            {
+                load = new Thread(() => { OpenClTest.Run(70, 2048, null); });
+            }
             load.IsBackground = true;
             load.Start();
 
             Thread.Sleep(15000);   // montee en regime
+            var sw = Stopwatch.StartNew();
             while (sw.Elapsed.TotalSeconds < 70)
             {
-                int rpm = SmiInt("fan.speed");
-                int gpu = SmiInt("temperature.gpu");
                 int r1, c1, r2, c2;
                 NvSensors.ReadFans(out r1, out c1, out r2, out c2);
                 if (r1 > 0) { sumRpm += r1; n++; if (r1 > maxRpm) maxRpm = r1; }
 
+                int gpu = SmiInt("temperature.gpu");
                 int gpuNv, hNv, memNv;
                 NvSensors.ReadTemps(out gpuNv, out hNv, out memNv);
                 if (gpuNv > gpu) gpu = gpuNv;
@@ -332,18 +372,19 @@ internal sealed partial class MainForm
                 Thread.Sleep(2000);
             }
 
-            int avg = n > 0 ? (int)(sumRpm / n) : 0;
-            rapport.AppendLine(string.Format("| {0} | {1} tr/min | {2} tr/min | {3} C | {4} C |",
-                profil, avg, maxRpm, maxGpu, maxMem));
-            LogMsg(string.Format("profil {0} : {1} tr/min moyen, GPU max {2} C, mem max {3} C",
-                profil, avg, maxGpu, maxMem));
+            string avgTxt = n > 0 ? (int)(sumRpm / n) + unit : "-";
+            string maxTxt = n > 0 ? maxRpm + unit : "-";
+            rapport.AppendLine(string.Format("| {0} | {1} | {2} | {3} C | {4} C |",
+                profil, avgTxt, maxTxt, maxGpu, maxMem));
+            LogMsg(string.Format("profil {0} : {1}, max {2}, GPU max {3} C, mem max {4} C",
+                profil, avgTxt, maxTxt, maxGpu, maxMem));
             Thread.Sleep(5000);
         }
 
-        // retour au profil equilibre
+        // Restauration du profil actif avant le test.
         try
         {
-            File.Copy(Path.Combine(Root, "profil-equilibre.txt"),
+            File.Copy(Path.Combine(Root, "profil-" + previous + ".txt"),
                       Path.Combine(Root, "fan-curve.txt"), true);
         }
         catch { }
@@ -359,7 +400,9 @@ internal sealed partial class MainForm
         Ui(() =>
         {
             _bar.Value = 100;
-            _step.Text = Lang.T("Test des profils termine (profil equilibre restaure).");
+            _step.Text = Lang.French
+                ? "Test des profils termine (profil " + previous + " restaure)."
+                : "Profile test finished (profile " + previous + " restored).";
         });
     }
 }
