@@ -188,7 +188,7 @@ internal static class Lang
         { "Tester les profils de ventilation", "Test fan profiles" },
         { "Optimisation de la ventilation", "Fan optimisation" },
         { "Appliquer ces valeurs", "Apply these values" },
-        { "Reappliquer au demarrage", "Reapply at startup" },
+        { "Appliquer la configuration au demarrage", "Apply configuration at startup" },
         { "Mesurer les frequences", "Measure frequencies" },
         { " tr/min", " rpm" }, { "tr/min", "rpm" },
         { "legere", "light" }, { "jeu", "gaming" },
@@ -216,6 +216,7 @@ internal static class Lang
         { "power limit inchange", "power limit unchanged" },
         { "Appliquer ces valeurs ?\n\n", "Apply these values?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "They have not been validated by a stability test." },
+        { "Courbe active", "Active curve" },
     };
 
     // ---------------- allemand ----------------
@@ -312,7 +313,7 @@ internal static class Lang
         { "Mise a jour ", "Update " },
         { "Trouver la configuration optimale", "Optimale Konfiguration finden" },
         { "Tester les profils de ventilation", "Lüfterprofile testen" },
-        { "Reappliquer au demarrage", "Beim Start erneut anwenden" },
+        { "Appliquer la configuration au demarrage", "Konfiguration beim Start anwenden" },
         { "Mesurer les frequences", "Taktraten messen" },
         { " tr/min", " U/min" },
         { "tr/min", "U/min" },
@@ -352,6 +353,7 @@ internal static class Lang
         { "power limit inchange", "Leistungslimit unverändert" },
         { "Appliquer ces valeurs ?\n\n", "Diese Werte anwenden?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "Sie wurden nicht durch einen Stabilitätstest geprüft." },
+        { "Courbe active", "Aktive Kurve" },
     };
 
     // ---------------- espagnol ----------------
@@ -448,7 +450,7 @@ internal static class Lang
         { "Mise a jour ", "Actualización " },
         { "Trouver la configuration optimale", "Buscar la configuración óptima" },
         { "Tester les profils de ventilation", "Probar los perfiles de ventilación" },
-        { "Reappliquer au demarrage", "Reaplicar al inicio" },
+        { "Appliquer la configuration au demarrage", "Aplicar la configuración al inicio" },
         { "Mesurer les frequences", "Medir las frecuencias" },
         { " tr/min", " rpm" },
         { "tr/min", "rpm" },
@@ -488,6 +490,7 @@ internal static class Lang
         { "power limit inchange", "límite de potencia sin cambios" },
         { "Appliquer ces valeurs ?\n\n", "¿Aplicar estos valores?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "No han sido validadas por una prueba de estabilidad." },
+        { "Courbe active", "Curva activa" },
     };
 
     // ---------------- italien ----------------
@@ -584,7 +587,7 @@ internal static class Lang
         { "Mise a jour ", "Aggiornamento " },
         { "Trouver la configuration optimale", "Trova la configurazione ottimale" },
         { "Tester les profils de ventilation", "Testa i profili ventole" },
-        { "Reappliquer au demarrage", "Riapplica all'avvio" },
+        { "Appliquer la configuration au demarrage", "Applica la configurazione all'avvio" },
         { "Mesurer les frequences", "Misura le frequenze" },
         { " tr/min", " rpm" },
         { "tr/min", "rpm" },
@@ -624,6 +627,7 @@ internal static class Lang
         { "power limit inchange", "limite di potenza invariato" },
         { "Appliquer ces valeurs ?\n\n", "Applicare questi valori?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "Non sono stati validati da un test di stabilità." },
+        { "Courbe active", "Curva attiva" },
     };
 
     // ---------------- portugais ----------------
@@ -720,7 +724,7 @@ internal static class Lang
         { "Mise a jour ", "Atualização " },
         { "Trouver la configuration optimale", "Encontrar a configuração ideal" },
         { "Tester les profils de ventilation", "Testar os perfis de ventoinha" },
-        { "Reappliquer au demarrage", "Reaplicar no arranque" },
+        { "Appliquer la configuration au demarrage", "Aplicar a configuração no arranque" },
         { "Mesurer les frequences", "Medir as frequências" },
         { " tr/min", " rpm" },
         { "tr/min", "rpm" },
@@ -760,5 +764,6 @@ internal static class Lang
         { "power limit inchange", "limite de potência inalterado" },
         { "Appliquer ces valeurs ?\n\n", "Aplicar estes valores?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "Não foram validados por um teste de estabilidade." },
+        { "Courbe active", "Curva ativa" },
     };
 }

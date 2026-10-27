@@ -960,3 +960,42 @@ Valeur ensuite restaurée à 320 W.
 Les messages de cette fonctionnalité existent dans les **cinq langues**
 (165 clés par langue) : erreurs de plage, confirmations, avertissements. Le
 build vérifie la parité et l'absence de doublon.
+
+---
+
+## 24. Actualisation de « Configuration appliquée » (v1.13.0)
+
+### 24.1 Bug corrigé
+
+La zone **« Configuration appliquée »** restait obsolète après une application
+manuelle. Deux causes :
+
+| Élément | Ancienne source | Problème |
+|---|---|---|
+| ligne `Undervolt` | dernière ligne « courbe appliquee » de `undervolt.log` | ce journal n'est écrit **qu'au démarrage**, pas par les boutons |
+| ligne `Courbe 831 mV` | `snu curve` filtré sur la chaîne **`831 mV`** | toute autre tension ne correspondait plus |
+
+### 24.2 Correction
+
+- `Undervolt` est construit depuis **`plateau-active.json`** (`ReadActivePoint`),
+  donc reflète immédiatement ce que les boutons viennent d'écrire. Le journal ne
+  sert plus que de repli.
+- La clé de section devient **« Courbe active »** et la valeur affiche la
+  tension et la fréquence réelles : `831 mV / 1845 MHz`. La regex n'est plus
+  liée à 831 mV.
+- `Refresh(true)` est appelé après chaque application, ce qui recharge la zone.
+
+### 24.3 Bouton renommé
+
+« Réappliquer au démarrage » → **« Appliquer la configuration au démarrage »**.
+
+| Langue | Libellé |
+|---|---|
+| Français | Appliquer la configuration au démarrage |
+| English | Apply configuration at startup |
+| Deutsch | Konfiguration beim Start anwenden |
+| Español | Aplicar la configuración al inicio |
+| Italiano | Applica la configurazione all'avvio |
+| Português | Aplicar a configuração no arranque |
+
+Dictionnaires à **166 clés** par langue, parité vérifiée par `check-lang.py`.

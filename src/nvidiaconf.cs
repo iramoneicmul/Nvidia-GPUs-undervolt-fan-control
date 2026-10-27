@@ -480,7 +480,7 @@ internal sealed partial class MainForm : Form
         _btnRestore.Click += (o, e) => RestoreOriginal();
         bottom.Controls.Add(_btnRestore);
 
-        _btnPersist = MakeButton("Reappliquer au demarrage", 364, 80, 176);
+        _btnPersist = MakeButton("Appliquer la configuration au demarrage", 364, 80, 176);
         _btnPersist.Click += (o, e) => InstallPersistence();
         bottom.Controls.Add(_btnPersist);
 
@@ -574,7 +574,7 @@ internal sealed partial class MainForm : Form
         int y3 = 8;
         y3 = Section(tConf, "Configuration appliquee", y3, new[]
         {
-            "Undervolt", "Power limit", "Profil ventilation", "Courbe 831 mV"
+            "Undervolt", "Power limit", "Profil ventilation", "Courbe active"
         });
 
         _targetMhzBox = AddTargetRow(tConf, "Frequence cible (MHz) :", y3 + 10,
@@ -1307,8 +1307,15 @@ internal sealed partial class MainForm : Form
     {
         try
         {
+            // La configuration appliquee se lit dans la courbe active : c'est
+            // elle que les boutons d'application viennent de reecrire.
+            int activeMhz, activeMv;
+            ReadActivePoint(out activeMhz, out activeMv);
+            if (activeMhz > 0 && activeMv > 0)
+                _s.Undervolt = activeMhz + " MHz a " + activeMv + " mV";
+
             string log = Path.Combine(Root, "undervolt.log");
-            if (File.Exists(log))
+            if (string.IsNullOrEmpty(_s.Undervolt) && File.Exists(log))
             {
                 string[] lines = File.ReadAllLines(log);
                 for (int i = lines.Length - 1; i >= 0; i--)
@@ -1337,8 +1344,10 @@ internal sealed partial class MainForm : Form
             DetectTorch();
 
             string dump = Run(Path.Combine(Root, "snu.exe"), "curve");
-            var mh = System.Text.RegularExpressions.Regex.Match(dump, @"831 mV\s*->\s*(\d+)\s*MHz");
-            if (mh.Success) _s.Curve831 = mh.Groups[1].Value + " MHz";
+            var mh = System.Text.RegularExpressions.Regex.Match(dump, @"(\d+) mV\s*->\s*(\d+)\s*MHz");
+            _s.Curve831 = mh.Success
+                ? mh.Groups[1].Value + " mV / " + mh.Groups[2].Value + " MHz"
+                : (activeMv > 0 && activeMhz > 0 ? activeMv + " mV / " + activeMhz + " MHz" : "-");
         }
         catch { }
     }
@@ -1438,7 +1447,7 @@ internal sealed partial class MainForm : Form
                 _profileBox.SelectedIndex = idx;
             }
         }
-        Set("Courbe 831 mV", _s.Curve831);
+        Set("Courbe active", _s.Curve831);
 
         Set("Frequence GPU", _s.ClockNow + " MHz");
         Set("Frequence memoire", _s.MemClockNow + " MHz");
