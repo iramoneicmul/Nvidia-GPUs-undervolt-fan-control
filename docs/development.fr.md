@@ -1033,3 +1033,54 @@ langues :
 | Português | Abrir relatório |
 
 Dictionnaires à **167 clés** par langue.
+
+---
+
+## 26. Démarrage silencieux (v1.13.2)
+
+### 26.1 Cause
+
+Le constructeur faisait :
+
+```csharp
+if (_startHidden)
+{
+    ShowInTaskbar = false;
+    Visible = false;
+}
+```
+
+`Application.Run(form)` **affiche** le formulaire après le constructeur : la
+valeur `Visible = false` était donc systématiquement écrasée, et la fenêtre
+apparaissait à chaque démarrage.
+
+### 26.2 Correction
+
+```csharp
+if (_startHidden)
+{
+    ShowInTaskbar = false;
+    Opacity = 0;                 // aucun clignotement pendant l'affichage
+    Shown += (o, e) =>
+    {
+        Hide();
+        Opacity = 1;
+    };
+}
+```
+
+Le masquage intervient **après** l'affichage réel, donc il n'est plus écrasé.
+
+### 26.3 Vérification
+
+Démarrage par la tâche planifiée `NvidiaConf` (`--tray`), contrôle des fenêtres
+dans la session interactive :
+
+```
+pid=14028 session=1 handle=0 titre=''
+visible=False  titre='NVIDIA Configuration - RTX 3080 Ti FE'
+processus : 1
+```
+
+La fenêtre existe, mais n'est pas visible ; l'icône reste dans la zone de
+notification et un clic l'ouvre.

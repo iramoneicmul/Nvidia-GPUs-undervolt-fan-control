@@ -380,8 +380,16 @@ internal sealed partial class MainForm : Form
         if (_autoTuneRequested) AutoTune();
         if (_startHidden)
         {
+            // Application.Run affiche le formulaire apres le constructeur :
+            // Visible = false ici serait ecrase. On masque donc des que la
+            // fenetre est reellement affichee, sans clignotement.
             ShowInTaskbar = false;
-            Visible = false;
+            Opacity = 0;
+            Shown += (o, e) =>
+            {
+                Hide();
+                Opacity = 1;
+            };
         }
     }
 
