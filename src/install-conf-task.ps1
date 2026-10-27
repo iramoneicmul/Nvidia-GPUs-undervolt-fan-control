@@ -55,3 +55,11 @@ if (Test-Path $smi) {
 }
 
 Log '  configuration et taches en place'
+
+# Nettoyage : les anciennes installations ajoutaient aussi une entree Run,
+# ce qui lancait nvidiaconf deux fois au logon et faisait apparaitre la
+# fenetre (la seconde instance signalait "Afficher"). La tache planifiee
+# suffit.
+try {
+    Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'NvidiaConf' -ErrorAction SilentlyContinue
+} catch { }

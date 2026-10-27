@@ -1901,7 +1901,14 @@ internal static class Program
         _mutex = new Mutex(true, "Local\\NvidiaConfSingleton", out createdNew);
         if (!createdNew)
         {
-            try { EventWaitHandle.OpenExisting("NvidiaConf.Show").Set(); } catch { }
+            // Instance deja active : on ne l'affiche QUE si l'utilisateur a
+            // lance l'application volontairement. Un demarrage automatique
+            // (--tray) ne doit jamais faire apparaitre la fenetre, meme si
+            // deux mecanismes de demarrage coexistent.
+            if (!hidden)
+            {
+                try { EventWaitHandle.OpenExisting("NvidiaConf.Show").Set(); } catch { }
+            }
             return 0;
         }
 

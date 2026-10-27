@@ -1084,3 +1084,67 @@ processus : 1
 
 La fenêtre existe, mais n'est pas visible ; l'icône reste dans la zone de
 notification et un clic l'ouvre.
+
+---
+
+## 27. Fenêtre au démarrage : la vraie cause (v1.13.3)
+
+### 27.1 Diagnostic
+
+Le masquage fonctionnait (v1.13.2), mais la fenêtre apparaissait quand même.
+Cause : **deux mécanismes de démarrage** coexistaient.
+
+```
+Tache planifiee NvidiaConf : C:\Nvidia\nvidiaconf.exe --tray
+Cle Run (HKLM)             : "C:\Nvidia\nvidiaconf.exe" --tray
+```
+
+Les deux lancent l'application au logon. La première instance prend le mutex et
+se masque. La seconde ne crée pas le mutex et exécutait :
+
+```csharp
+try { EventWaitHandle.OpenExisting("NvidiaConf.Show").Set(); } catch { }
+```
+
+Ce signal était prévu pour un clic volontaire de l'utilisateur, mais il était
+envoyé **aussi** par le démarrage automatique : la fenêtre de la première
+instance s'affichait.
+
+### 27.2 Corrections
+
+```csharp
+if (!createdNew)
+{
+    // Afficher uniquement sur un lancement volontaire.
+    if (!hidden)
+    {
+        try { EventWaitHandle.OpenExisting("NvidiaConf.Show").Set(); } catch { }
+    }
+    return 0;
+}
+```
+
+- `--tray` ne signale plus rien.
+- L'installeur supprime la clé `Run` devenue redondante :
+
+```powershell
+Remove-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' `
+    -Name 'NvidiaConf' -ErrorAction SilentlyContinue
+```
+
+Cette suppression a été appliquée à Hellfire.
+
+### 27.3 Preuves
+
+Journal après deux lancements automatiques consécutifs : deux lignes
+`demarrage args=--tray`, **aucune** ligne `traitement de la demande d'affichage`.
+
+Contrôle des fenêtres dans la session interactive :
+
+```
+pid=21468 session=2 handle=0 titre=''
+visible=False  titre='NVIDIA Configuration - RTX 3080 Ti FE'
+```
+
+La fenêtre existe, n'est pas visible, et l'icône reste dans la zone de
+notification. Un clic gauche l'affiche (lancement volontaire → `Show`).
