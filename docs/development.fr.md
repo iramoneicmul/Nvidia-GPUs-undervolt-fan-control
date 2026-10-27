@@ -999,3 +999,37 @@ manuelle. Deux causes :
 | Português | Aplicar a configuração no arranque |
 
 Dictionnaires à **166 clés** par langue, parité vérifiée par `check-lang.py`.
+
+---
+
+## 25. Bouton « Ouvrir le rapport » (v1.13.1)
+
+Avant : le bouton de l'onglet Configuration appelait `OpenComparativeReport()`,
+qui **générait un fichier HTML et l'ouvrait dans le navigateur par défaut**.
+
+Après :
+
+```csharp
+btnReport.Click += (o, e) => { tabs.SelectedTab = tReport; RefreshReportTab(); };
+```
+
+Le bouton :
+
+1. sélectionne l'onglet **Rapport** ;
+2. appelle `RefreshReportTab()`, qui construit le HTML et l'injecte dans le
+   `WebBrowser` intégré (`_reportView.DocumentText`).
+
+Aucun navigateur externe n'est plus lancé depuis ce bouton. Le libellé passe de
+« Ouvrir le rapport comparatif » à « Ouvrir le rapport », traduit dans les cinq
+langues :
+
+| Langue | Libellé |
+|---|---|
+| Français | Ouvrir le rapport |
+| English | Open report |
+| Deutsch | Bericht öffnen |
+| Español | Abrir informe |
+| Italiano | Apri report |
+| Português | Abrir relatório |
+
+Dictionnaires à **167 clés** par langue.

@@ -617,8 +617,9 @@ internal sealed partial class MainForm : Form
         _targetMvBox.TextChanged += live;
         _targetPlBox.TextChanged += live;
 
-        var btnReport = MakeButton("Ouvrir le rapport comparatif", 18, y3 + 164, 260);
-        btnReport.Click += (o, e) => OpenComparativeReport();
+        var btnReport = MakeButton("Ouvrir le rapport", 18, y3 + 164, 260);
+        // Ouvre l'onglet Rapport et y affiche le rapport comparatif.
+        btnReport.Click += (o, e) => { tabs.SelectedTab = tReport; RefreshReportTab(); };
         tConf.Controls.Add(btnReport);
 
         var btnHistory = MakeButton("Historique des configurations", 288, y3 + 164, 250);

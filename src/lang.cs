@@ -217,6 +217,7 @@ internal static class Lang
         { "Appliquer ces valeurs ?\n\n", "Apply these values?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "They have not been validated by a stability test." },
         { "Courbe active", "Active curve" },
+        { "Ouvrir le rapport", "Open report" },
     };
 
     // ---------------- allemand ----------------
@@ -354,6 +355,7 @@ internal static class Lang
         { "Appliquer ces valeurs ?\n\n", "Diese Werte anwenden?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "Sie wurden nicht durch einen Stabilitätstest geprüft." },
         { "Courbe active", "Aktive Kurve" },
+        { "Ouvrir le rapport", "Bericht öffnen" },
     };
 
     // ---------------- espagnol ----------------
@@ -491,6 +493,7 @@ internal static class Lang
         { "Appliquer ces valeurs ?\n\n", "¿Aplicar estos valores?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "No han sido validadas por una prueba de estabilidad." },
         { "Courbe active", "Curva activa" },
+        { "Ouvrir le rapport", "Abrir informe" },
     };
 
     // ---------------- italien ----------------
@@ -628,6 +631,7 @@ internal static class Lang
         { "Appliquer ces valeurs ?\n\n", "Applicare questi valori?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "Non sono stati validati da un test di stabilità." },
         { "Courbe active", "Curva attiva" },
+        { "Ouvrir le rapport", "Apri report" },
     };
 
     // ---------------- portugais ----------------
@@ -765,5 +769,6 @@ internal static class Lang
         { "Appliquer ces valeurs ?\n\n", "Aplicar estes valores?\n\n" },
         { "Elles n'ont pas ete validees par un test de stabilite.", "Não foram validados por um teste de estabilidade." },
         { "Courbe active", "Curva ativa" },
+        { "Ouvrir le rapport", "Abrir relatório" },
     };
 }
