@@ -180,7 +180,7 @@ internal sealed partial class MainForm
     // ------------------------------------------------------------------
     public void CliFanTest()
     {
-        try { DoTestFanProfiles(); }
+        try { DoOptimizeFanProfiles(); }
         catch (Exception e) { LogMsg("CliFanTest " + e.Message); }
     }
 
@@ -193,7 +193,7 @@ internal sealed partial class MainForm
 
         var th = new Thread(() =>
         {
-            try { DoTestFanProfiles(); }
+            try { DoOptimizeFanProfiles(); }
             catch (Exception e) { LogMsg("FAN TEST FATAL " + e); Ui(() => { _step.Text = Lang.T("Echec : ") + e.Message; }); }
             finally
             {
@@ -282,109 +282,113 @@ internal sealed partial class MainForm
         return choisi;
     }
 
-    private void DoTestFanProfiles()
+    // ==================================================================
+    //  Optimisation de la ventilation
+    //  Determine, pour trois cibles thermiques, le regime minimal qui les
+    //  tient avec la configuration appliquee, puis genere et enregistre les
+    //  trois courbes (silence / equilibre / froid).
+    // ==================================================================
+    private void DoOptimizeFanProfiles()
     {
         string[] profils = { "silence", "equilibre", "froid" };
-
-        // Profil actif avant le test : il sera restaure a la fin.
-        string previous = "equilibre";
-        try
-        {
-            string cur = File.ReadAllText(Path.Combine(Root, "fan-curve.txt"));
-            if (cur.Contains("SILENCE")) previous = "silence";
-            else if (cur.Contains("FROID")) previous = "froid";
-        }
-        catch { }
+        int[] cibles = { 82, 78, 74 };
+        int[] departs = { 1000, 1300, 1800 };
+        string unit = Lang.French ? " tr/min" : " rpm";
+        string py = ResolvePython();
+        double pl = _s.PowerLimit > 0 ? _s.PowerLimit : 320;
 
         var rapport = new StringBuilder();
-        rapport.AppendLine("# " + (Lang.French ? "Test des profils de ventilation - " : "Fan profile test - ") +
+        rapport.AppendLine("# " + (Lang.French ? "Optimisation de la ventilation - " : "Fan optimisation - ") +
                            DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
         rapport.AppendLine();
+        rapport.AppendLine((Lang.French ? "Configuration appliquee : " : "Applied configuration: ") +
+                           _s.Undervolt + " / power limit " + pl.ToString("0") + " W");
+        rapport.AppendLine();
         rapport.AppendLine(Lang.French
-            ? "| Profil | Regime moyen | Regime max | GPU max | Memoire max |"
-            : "| Profile | Average speed | Max speed | Max GPU | Max memory |");
-        rapport.AppendLine("|---|---|---|---|---|");
-
-        string py = ResolvePython();
-        string unit = Lang.French ? " tr/min" : " rpm";
+            ? "| Profil | Cible | Regime retenu | Temperature tenue |"
+            : "| Profile | Target | Retained speed | Held temperature |");
+        rapport.AppendLine("|---|---|---|---|");
 
         for (int p = 0; p < profils.Length; p++)
         {
             string profil = profils[p];
+            int cible = cibles[p];
+            int rpm = departs[p];
+            int retenu = -1, tenue = 0;
             int idx = p;
+
             Ui(() =>
             {
                 _step.Text = string.Format(Lang.French
-                    ? "Test du profil {0} ({1}/3) - charge 70 s"
-                    : "Testing profile {0} ({1}/3) - 70 s load", profil, idx + 1);
+                    ? "Ventilation {0} : recherche du regime (cible {1} C)"
+                    : "Cooling {0}: searching speed (target {1} C)", profil, cible);
                 _bar.Value = (int)(100.0 * idx / 3);
             });
 
-            try
-            {
-                File.Copy(Path.Combine(Root, "profil-" + profil + ".txt"),
-                          Path.Combine(Root, "fan-curve.txt"), true);
-            }
-            catch (Exception e) { LogMsg("profil " + profil + " : " + e.Message); }
-            Thread.Sleep(4000);
-
-            long sumRpm = 0; int n = 0, maxRpm = 0, maxGpu = 0, maxMem = 0;
-
-            // Charge PyTorch si disponible (meme severite que l'assistant),
-            // sinon repli OpenCL.
-            Thread load;
+            Process load = null;
+            Thread loadThread;
             if (py != null)
             {
-                load = new Thread(() =>
+                loadThread = new Thread(() =>
                 {
                     try
                     {
                         var psi = new ProcessStartInfo(py,
-                            "\"C:\\Nvidia\\stress-long.py\" 70 2048")
+                            "\"C:\\Nvidia\\stress-long.py\" 300 2048")
                         { UseShellExecute = false, CreateNoWindow = true };
-                        using (var proc = Process.Start(psi))
-                            proc.WaitForExit(100000);
+                        load = Process.Start(psi);
+                        if (load != null) load.WaitForExit(340000);
                     }
                     catch { }
                 });
             }
             else
             {
-                load = new Thread(() => { OpenClTest.Run(70, 2048, null); });
+                loadThread = new Thread(() => { OpenClTest.Run(300, 2048, null); });
             }
-            load.IsBackground = true;
-            load.Start();
+            loadThread.IsBackground = true;
+            loadThread.Start();
+            Thread.Sleep(20000);
 
-            Thread.Sleep(15000);   // montee en regime
-            var sw = Stopwatch.StartNew();
-            while (sw.Elapsed.TotalSeconds < 70)
+            for (int essai = 0; essai < 6 && retenu < 0; essai++)
             {
-                int r1, c1, r2, c2;
-                NvSensors.ReadFans(out r1, out c1, out r2, out c2);
-                if (r1 > 0) { sumRpm += r1; n++; if (r1 > maxRpm) maxRpm = r1; }
+                WriteFlatCurve(rpm);
+                Thread.Sleep(45000);
 
-                int gpu = SmiInt("temperature.gpu");
-                int gpuNv, hNv, memNv;
-                NvSensors.ReadTemps(out gpuNv, out hNv, out memNv);
-                if (gpuNv > gpu) gpu = gpuNv;
-                if (gpu > maxGpu) maxGpu = gpu;
-                if (memNv > maxMem) maxMem = memNv;
-                Thread.Sleep(2000);
+                int g, h, mm;
+                NvSensors.ReadTemps(out g, out h, out mm);
+                LogMsg(string.Format("ventilation {0} : essai {1}, {2}{3}, GPU {4} C (cible {5})",
+                    profil, essai + 1, rpm, unit, g, cible));
+
+                if (g > 0 && g <= cible)
+                {
+                    retenu = rpm;
+                    tenue = g;
+                }
+                else
+                {
+                    rpm += 300;
+                    if (rpm > 3400) rpm = 3400;
+                }
             }
 
-            string avgTxt = n > 0 ? (int)(sumRpm / n) + unit : "-";
-            string maxTxt = n > 0 ? maxRpm + unit : "-";
-            rapport.AppendLine(string.Format("| {0} | {1} | {2} | {3} C | {4} C |",
-                profil, avgTxt, maxTxt, maxGpu, maxMem));
-            LogMsg(string.Format("profil {0} : {1}, max {2}, GPU max {3} C, mem max {4} C",
-                profil, avgTxt, maxTxt, maxGpu, maxMem));
-            Thread.Sleep(5000);
+            try { if (load != null && !load.HasExited) load.Kill(); } catch { }
+            if (retenu < 0) { retenu = 3400; tenue = cible + 5; }
+
+            SaveOriginalProfile(profil);
+            GenerateProfile(profil, retenu, cible);
+
+            rapport.AppendLine(string.Format("| {0} | {1} C | {2}{3} | {4} C |",
+                profil, cible, retenu, unit, tenue));
+            LogMsg(string.Format("ventilation {0} : regime retenu {1}{2} pour {3} C (tenu {4} C)",
+                profil, retenu, unit, cible, tenue));
+
+            Thread.Sleep(8000);
         }
 
-        // Restauration du profil actif avant le test.
         try
         {
-            File.Copy(Path.Combine(Root, "profil-" + previous + ".txt"),
+            File.Copy(Path.Combine(Root, "profil-equilibre.txt"),
                       Path.Combine(Root, "fan-curve.txt"), true);
         }
         catch { }
@@ -401,12 +405,81 @@ internal sealed partial class MainForm
         {
             _bar.Value = 100;
             _step.Text = Lang.French
-                ? "Test des profils termine (profil " + previous + " restaure)."
-                : "Profile test finished (profile " + previous + " restored).";
+                ? "Optimisation terminee : 3 courbes enregistrees. Choisissez le profil."
+                : "Optimisation complete: 3 curves saved. Choose a profile.";
+            if (_profileBox != null) _profileBox.SelectedIndex = 1;
         });
     }
-}
 
+    private void WriteFlatCurve(int rpm)
+    {
+        try
+        {
+            var lines = new List<string>();
+            lines.Add("# courbe temporaire - optimisation de la ventilation");
+            lines.Add("auto_below=46");
+            lines.Add("hysteresis=4");
+            lines.Add("interval_ms=2000");
+            lines.Add("failsafe_c=88");
+            lines.Add("failsafe_mem_c=95");
+            lines.Add("reapply_undervolt_minutes=5");
+            lines.Add("undervolt_script=C:\\ProgramData\\NvidiaUndervolt\\apply-undervolt.ps1");
+            foreach (int t in new[] { 50, 56, 62, 68, 72, 76, 79, 82, 85, 88, 91 })
+                lines.Add(t + "=" + rpm);
+            File.WriteAllLines(Path.Combine(Root, "fan-curve.txt"), lines);
+            LogMsg("ventilation : regime temporaire " + rpm);
+        }
+        catch (Exception e) { LogMsg("courbe temporaire : " + e.Message); }
+    }
+
+    private void SaveOriginalProfile(string profil)
+    {
+        try
+        {
+            string src = Path.Combine(Root, "profil-" + profil + ".txt");
+            string bak = src + ".bak";
+            if (File.Exists(src) && !File.Exists(bak)) File.Copy(src, bak, true);
+        }
+        catch { }
+    }
+
+    private void GenerateProfile(string profil, int rpmCible, int cible)
+    {
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# =====================================================================");
+            sb.AppendLine("#  PROFIL \"" + profil.ToUpperInvariant() + "\" - genere par optimisation");
+            sb.AppendLine("#  Cible " + cible + " C : " + rpmCible + " tr/min sous charge.");
+            sb.AppendLine("#  Configuration : " + _s.Undervolt);
+            sb.AppendLine("# =====================================================================");
+            sb.AppendLine("auto_below=46");
+            sb.AppendLine("hysteresis=4");
+            sb.AppendLine("interval_ms=2000");
+            sb.AppendLine("failsafe_c=" + Math.Max(cible + 3, 85));
+            sb.AppendLine("failsafe_mem_c=95");
+            sb.AppendLine("reapply_undervolt_minutes=5");
+            sb.AppendLine("undervolt_script=C:\\ProgramData\\NvidiaUndervolt\\apply-undervolt.ps1");
+            sb.AppendLine();
+
+            foreach (int t in new[] { 50, 56, 62, 68, 72, 76, 79, 82, 85, 88, 91 })
+            {
+                int rpm;
+                if (t <= cible) rpm = rpmCible - (cible - t) * 120;
+                else rpm = rpmCible + (t - cible) * 150;
+
+                if (rpm < 800) rpm = 800;
+                if (rpm > 3400) rpm = 3400;
+                rpm = (int)(Math.Round(rpm / 10.0) * 10);
+                sb.AppendLine(t + "=" + rpm);
+            }
+
+            File.WriteAllText(Path.Combine(Root, "profil-" + profil + ".txt"), sb.ToString());
+            LogMsg("profil " + profil + " genere : " + rpmCible + " tr/min a " + cible + " C");
+        }
+        catch (Exception e) { LogMsg("generation profil : " + e.Message); }
+    }
+}
 
 /// <summary>Petit graphique temps reel : temperature, puissance, frequence.</summary>
 internal sealed class MiniGraph : Panel

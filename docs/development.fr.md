@@ -838,3 +838,64 @@ verdict : c'est à l'utilisateur de comparer bruit et températures.
 - Il ne choisit pas de profil : l'assistant d'optimisation, lui, teste puis
   **retient** le plus silencieux qui tient le seuil (`TestFanProfilesForPackage`).
 - Il ne compare pas avec la configuration d'origine.
+
+---
+
+## 22. Optimisation de la ventilation (v1.11.0)
+
+Le bouton, renommé **« Optimisation de la ventilation »**, ne mesure plus : il
+**détermine et enregistre** trois courbes.
+
+### 22.1 Algorithme
+
+| Profil | Cible | Régime de départ |
+|---|---|---|
+| `silence` | 82 °C | 1 000 tr/min |
+| `equilibre` | 78 °C | 1 300 tr/min |
+| `froid` | 74 °C | 1 800 tr/min |
+
+Pour chaque profil :
+
+1. charge **PyTorch continue de 300 s** (2048), avec la configuration déjà
+   appliquée à la carte ;
+2. courbe plate temporaire au régime courant, puis **45 s de stabilisation** ;
+3. lecture GPU/mémoire ; si la cible est tenue, le régime est retenu, sinon il
+   augmente de **300 tr/min** (6 essais maximum) ;
+4. la courbe complète est générée autour du point mesuré ;
+5. sauvegarde de l'original en `.bak`, puis réécriture du profil.
+
+### 22.2 Génération de la courbe
+
+Point d'ancrage : `(cible, régime retenu)`. Puis, pour chaque palier de
+température :
+
+```
+si T <= cible : rpm = rpmCible - (cible - T) * 120
+sinon         : rpm = rpmCible + (T - cible) * 150
+bornes        : 800 .. 3400 tr/min, arrondi à 10
+```
+
+Paliers écrits : 50, 56, 62, 68, 72, 76, 79, 82, 85, 88, 91 °C.
+
+Le `failsafe_c` est fixé à `max(cible + 3, 85)`.
+
+### 22.3 Choix de l'utilisateur
+
+À la fin, le profil `equilibre` devient actif et le sélecteur est positionné
+dessus. **L'utilisateur choisit ensuite** librement parmi les trois courbes.
+
+### 22.4 Rapport
+
+`C:\Nvidia\rapport-ventilation-AAAAMMJJ-HHMMSS.md` :
+
+| Profil | Cible | Régime retenu | Température tenue |
+|---|---|---|---|
+
+### 22.5 Points d'attention
+
+- La durée est d'environ **15 minutes** (3 × 300 s de charge + transitions).
+- Les courbes sont **remplacées** : les originaux restent en `.bak`, mais une
+  nouvelle exécution écrase le `.bak` précédent (il n'est créé qu'une fois).
+- Le calcul suppose que la puissance dissipée reste celle de la configuration
+  courante ; changer de tension ou de power limit justifie une nouvelle
+  optimisation.

@@ -491,7 +491,7 @@ internal sealed partial class MainForm : Form
         btnFreq.Click += (o, e) => MeasureFrequencies();
         bottom.Controls.Add(btnFreq);
 
-        var btnFanTest = MakeButton("Tester les profils de ventilation", 16, 80, 240);
+        var btnFanTest = MakeButton("Optimisation de la ventilation", 16, 80, 240);
         btnFanTest.Click += (o, e) => TestFanProfiles();
         bottom.Controls.Add(btnFanTest);
 

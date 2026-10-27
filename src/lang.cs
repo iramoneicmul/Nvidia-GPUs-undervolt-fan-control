@@ -186,6 +186,7 @@ internal static class Lang
         { "Mise a jour ", "Update " },
         { "Trouver la configuration optimale", "Find the optimal configuration" },
         { "Tester les profils de ventilation", "Test fan profiles" },
+        { "Optimisation de la ventilation", "Fan optimisation" },
         { "Reappliquer au demarrage", "Reapply at startup" },
         { "Mesurer les frequences", "Measure frequencies" },
         { " tr/min", " rpm" }, { "tr/min", "rpm" },
@@ -312,6 +313,7 @@ internal static class Lang
         { "Froid", "Kühl" },
         { "Changement de langue impossible pendant un test.", "Sprachwechsel während eines Tests nicht möglich." },
         { "Comparatif termine - rapport affiche dans l'onglet Rapport.", "Vergleich abgeschlossen - Bericht im Tab Bericht angezeigt." },
+        { "Optimisation de la ventilation", "Lüfteroptimierung" },
     };
 
     // ---------------- espagnol ----------------
@@ -428,6 +430,7 @@ internal static class Lang
         { "Froid", "Frío" },
         { "Changement de langue impossible pendant un test.", "No se puede cambiar el idioma durante una prueba." },
         { "Comparatif termine - rapport affiche dans l'onglet Rapport.", "Comparación completada - informe mostrado en la pestaña Informe." },
+        { "Optimisation de la ventilation", "Optimización de la ventilación" },
     };
 
     // ---------------- italien ----------------
@@ -544,6 +547,7 @@ internal static class Lang
         { "Froid", "Freddo" },
         { "Changement de langue impossible pendant un test.", "Impossibile cambiare lingua durante un test." },
         { "Comparatif termine - rapport affiche dans l'onglet Rapport.", "Confronto completato - report mostrato nella scheda Report." },
+        { "Optimisation de la ventilation", "Ottimizzazione della ventilazione" },
     };
 
     // ---------------- portugais ----------------
@@ -660,5 +664,6 @@ internal static class Lang
         { "Froid", "Frio" },
         { "Changement de langue impossible pendant un test.", "Não é possível mudar o idioma durante um teste." },
         { "Comparatif termine - rapport affiche dans l'onglet Rapport.", "Comparação concluída - relatório mostrado no separador Relatório." },
+        { "Optimisation de la ventilation", "Otimização da ventilação" },
     };
 }
